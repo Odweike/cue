@@ -4,7 +4,7 @@ import SwiftUI
 
 struct FloatingControlBar: View {
     let viewModel: PlayerViewModel
-    private let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
+    private let refreshTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(spacing: 8) {
