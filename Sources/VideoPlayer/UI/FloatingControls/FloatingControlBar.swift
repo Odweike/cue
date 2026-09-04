@@ -175,6 +175,11 @@ struct FloatingControlsOverlay: View {
     var body: some View {
         GeometryReader { geometry in
             let panelSize = panelSize(in: geometry.size)
+            let resizeDelta = CGSize(
+                width: panelSize.width - storedWidth,
+                height: panelSize.height - storedHeight
+            )
+            let resizeOffsetAdjustment = Self.offsetAdjustment(for: resizeDelta)
 
             VStack {
                 Spacer()
@@ -196,8 +201,8 @@ struct FloatingControlsOverlay: View {
                         resizeHandle(in: geometry.size)
                     }
                     .offset(
-                        x: storedOffsetX + moveOffset.width,
-                        y: storedOffsetY + moveOffset.height
+                        x: storedOffsetX + moveOffset.width + resizeOffsetAdjustment.width,
+                        y: storedOffsetY + moveOffset.height + resizeOffsetAdjustment.height
                     )
                     .padding(.horizontal, 16)
                     .padding(.bottom, 24)
@@ -250,18 +255,39 @@ struct FloatingControlsOverlay: View {
                 state = value.translation
             }
             .onEnded { value in
-                storedWidth += value.translation.width
-                storedHeight += value.translation.height
+                let resizedSize = resizedPanelSize(for: value.translation, in: availableSize)
+                let offsetAdjustment = Self.offsetAdjustment(
+                    for: CGSize(
+                        width: resizedSize.width - storedWidth,
+                        height: resizedSize.height - storedHeight
+                    )
+                )
+
+                storedWidth = resizedSize.width
+                storedHeight = resizedSize.height
+                storedOffsetX += offsetAdjustment.width
+                storedOffsetY += offsetAdjustment.height
                 keepPanelVisible(in: availableSize)
             }
     }
 
+    static func offsetAdjustment(for sizeDelta: CGSize) -> CGSize {
+        CGSize(width: sizeDelta.width / 2, height: sizeDelta.height)
+    }
+
     private func panelSize(in availableSize: CGSize) -> CGSize {
-        let maximumWidth = min(max(availableSize.width - 32, 500), 760)
+        resizedPanelSize(for: resizeOffset, in: availableSize)
+    }
+
+    private func resizedPanelSize(for translation: CGSize, in availableSize: CGSize) -> CGSize {
+        let currentLeft = (availableSize.width - storedWidth) / 2 + storedOffsetX
+        let currentTop = availableSize.height - 24 - storedHeight + storedOffsetY
+        let maximumWidth = min(max(availableSize.width - 16 - currentLeft, 500), 760)
+        let maximumHeight = min(max(availableSize.height - 16 - currentTop, 116), 168)
 
         return CGSize(
-            width: min(max(storedWidth + resizeOffset.width, 500), maximumWidth),
-            height: min(max(storedHeight + resizeOffset.height, 116), 168)
+            width: min(max(storedWidth + translation.width, 500), maximumWidth),
+            height: min(max(storedHeight + translation.height, 116), maximumHeight)
         )
     }
 
@@ -274,6 +300,6 @@ struct FloatingControlsOverlay: View {
         let maximumUpwardOffset = max(availableSize.height - storedHeight - 48, 0)
 
         storedOffsetX = min(max(storedOffsetX, -maxHorizontalOffset), maxHorizontalOffset)
-        storedOffsetY = min(max(storedOffsetY, -maximumUpwardOffset), 0)
+        storedOffsetY = min(max(storedOffsetY, -maximumUpwardOffset), 8)
     }
 }
