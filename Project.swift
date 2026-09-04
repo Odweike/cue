@@ -5,7 +5,8 @@ let settings: Settings = .settings(base: [
     "MACOSX_DEPLOYMENT_TARGET": "26.0",
     "MARKETING_VERSION": "0.1.0",
     "CURRENT_PROJECT_VERSION": "1",
-    "CODE_SIGN_STYLE": "Automatic"
+    "CODE_SIGN_STYLE": "Automatic",
+    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
 ])
 
 let project = Project(
@@ -23,12 +24,14 @@ let project = Project(
             bundleId: "dev.maxim.videoplayer",
             deploymentTargets: .macOS("26.0"),
             infoPlist: .extendingDefault(with: [
-                "CFBundleDisplayName": "VideoPlayer",
+                "CFBundleDisplayName": "VoxFrame",
+                "CFBundleName": "VoxFrame",
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
                 "LSApplicationCategoryType": "public.app-category.video"
             ]),
             sources: ["Sources/VideoPlayer/**"],
+            resources: ["Sources/VideoPlayer/Resources/**"],
             dependencies: [],
             settings: settings
         ),
@@ -44,4 +47,3 @@ let project = Project(
         )
     ]
 )
-
