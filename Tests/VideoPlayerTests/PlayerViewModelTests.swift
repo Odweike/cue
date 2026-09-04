@@ -33,6 +33,30 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.skipInterval, 10)
     }
+
+    func testSubtitleStylesPersistBetweenViewModels() {
+        let suiteName = "PlayerViewModelTests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        defer { userDefaults.removePersistentDomain(forName: suiteName) }
+        let style = SubtitleStyle(
+            fontSize: 36,
+            textColor: .cyan,
+            backgroundOpacity: 0.4,
+            bottomPadding: 210
+        )
+
+        let firstViewModel = PlayerViewModel(
+            playbackEngine: PlaybackEngineSpy(),
+            userDefaults: userDefaults
+        )
+        firstViewModel.setSubtitleStyle(style, at: 1)
+        let restoredViewModel = PlayerViewModel(
+            playbackEngine: PlaybackEngineSpy(),
+            userDefaults: userDefaults
+        )
+
+        XCTAssertEqual(restoredViewModel.subtitleStyles[1], style)
+    }
 }
 
 @MainActor

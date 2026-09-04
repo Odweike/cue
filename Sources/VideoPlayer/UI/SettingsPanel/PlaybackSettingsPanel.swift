@@ -20,10 +20,12 @@ struct PlaybackSettingsPanel: View {
                 videoSettings
             case .audio:
                 audioSettings
+            case .subtitles:
+                SubtitleStyleEditor(viewModel: viewModel)
             }
         }
         .padding(16)
-        .frame(width: 360, height: 250)
+        .frame(width: 380, height: 330)
     }
 
     private var videoSettings: some View {
@@ -97,6 +99,7 @@ struct PlaybackSettingsPanel: View {
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case video
     case audio
+    case subtitles
 
     var id: Self { self }
 
@@ -104,6 +107,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .video: "Video"
         case .audio: "Audio"
+        case .subtitles: "Subtitles"
         }
     }
 
@@ -111,6 +115,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .video: "film"
         case .audio: "speaker.wave.2"
+        case .subtitles: "captions.bubble"
         }
     }
 }

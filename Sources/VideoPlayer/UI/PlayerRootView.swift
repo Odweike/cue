@@ -17,7 +17,10 @@ struct PlayerRootView: View {
                     }
                 }
             } else {
-                SubtitleOverlay(cues: viewModel.visibleSubtitleCues)
+                SubtitleOverlay(
+                    cues: viewModel.visibleSubtitleCues,
+                    styleForTrack: viewModel.subtitleStyle(for:)
+                )
 
                 FloatingControlsOverlay(viewModel: viewModel)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
