@@ -22,7 +22,7 @@ struct FloatingControlBar: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
-        .frame(width: 620)
+        .frame(maxWidth: 620)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -127,3 +127,54 @@ struct FloatingControlBar: View {
     }
 }
 
+struct FloatingControlsOverlay: View {
+    let viewModel: PlayerViewModel
+
+    @AppStorage("FloatingControlsOffsetX") private var storedOffsetX = 0.0
+    @AppStorage("FloatingControlsOffsetY") private var storedOffsetY = 0.0
+    @GestureState private var dragOffset = CGSize.zero
+
+    var body: some View {
+        GeometryReader { geometry in
+            VStack {
+                Spacer()
+
+                FloatingControlBar(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                    .offset(
+                        x: storedOffsetX + dragOffset.width,
+                        y: storedOffsetY + dragOffset.height
+                    )
+                    .gesture(dragGesture(in: geometry.size))
+            }
+            .onAppear {
+                keepPanelVisible(in: geometry.size)
+            }
+            .onChange(of: geometry.size) { _, newSize in
+                keepPanelVisible(in: newSize)
+            }
+        }
+    }
+
+    private func dragGesture(in availableSize: CGSize) -> some Gesture {
+        DragGesture()
+            .updating($dragOffset) { value, state, _ in
+                state = value.translation
+            }
+            .onEnded { value in
+                storedOffsetX += value.translation.width
+                storedOffsetY += value.translation.height
+                keepPanelVisible(in: availableSize)
+            }
+    }
+
+    private func keepPanelVisible(in availableSize: CGSize) {
+        let panelWidth = min(620, max(availableSize.width - 32, 0))
+        let maxHorizontalOffset = max((availableSize.width - panelWidth) / 2 - 16, 0)
+        let maximumUpwardOffset = max(availableSize.height - 150, 0)
+
+        storedOffsetX = min(max(storedOffsetX, -maxHorizontalOffset), maxHorizontalOffset)
+        storedOffsetY = min(max(storedOffsetY, -maximumUpwardOffset), 0)
+    }
+}

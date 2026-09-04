@@ -10,17 +10,18 @@ struct PlayerRootView: View {
 
             AVPlayerContainerView(playerView: viewModel.playbackEngine.renderView)
 
-            FloatingPanelPresenter(viewModel: viewModel)
-                .frame(width: 0, height: 0)
-
             if viewModel.currentURL == nil {
                 WelcomeView {
                     if let url = VideoFilePicker.chooseVideo() {
                         viewModel.open(url)
                     }
                 }
+            } else {
+                FloatingControlsOverlay(viewModel: viewModel)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.easeOut(duration: 0.2), value: viewModel.currentURL)
         .navigationTitle(viewModel.currentURL?.lastPathComponent ?? "VideoPlayer")
     }
 }
