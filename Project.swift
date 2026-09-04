@@ -1,13 +1,18 @@
 import ProjectDescription
 
-let settings: Settings = .settings(base: [
+let baseSettings: [String: SettingValue] = [
     "SWIFT_VERSION": "6.0",
     "MACOSX_DEPLOYMENT_TARGET": "26.0",
     "MARKETING_VERSION": "0.1.0",
     "CURRENT_PROJECT_VERSION": "1",
     "CODE_SIGN_STYLE": "Automatic",
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
-])
+]
+
+var appSettings = baseSettings
+appSettings["PRODUCT_NAME"] = "VoxFrame"
+appSettings["EXECUTABLE_NAME"] = "VideoPlayer"
+appSettings["PRODUCT_MODULE_NAME"] = "VideoPlayer"
 
 let project = Project(
     name: "VideoPlayer",
@@ -15,7 +20,7 @@ let project = Project(
         disableBundleAccessors: true,
         disableSynthesizedResourceAccessors: true
     ),
-    settings: settings,
+    settings: .settings(base: baseSettings),
     targets: [
         .target(
             name: "VideoPlayer",
@@ -33,7 +38,7 @@ let project = Project(
             sources: ["Sources/VideoPlayer/**"],
             resources: ["Sources/VideoPlayer/Resources/**"],
             dependencies: [],
-            settings: settings
+            settings: .settings(base: appSettings)
         ),
         .target(
             name: "VideoPlayerTests",
