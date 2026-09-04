@@ -5,6 +5,8 @@ import AVKit
 final class AVPlaybackEngine: PlaybackEngine {
     private let player = AVPlayer()
     private let playerView = AVPlayerView()
+    private var playbackRate: Float = 1
+    private var videoScalingMode = VideoScalingMode.fit
 
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
@@ -13,7 +15,10 @@ final class AVPlaybackEngine: PlaybackEngine {
             currentTime: finiteSeconds(player.currentTime().seconds),
             duration: finiteSeconds(player.currentItem?.duration.seconds),
             isPlaying: player.rate != 0 || player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
-            volume: player.volume
+            volume: player.volume,
+            isMuted: player.isMuted,
+            playbackRate: playbackRate,
+            videoScalingMode: videoScalingMode
         )
     }
 
@@ -26,11 +31,11 @@ final class AVPlaybackEngine: PlaybackEngine {
     func open(_ url: URL) {
         currentURL = url
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
-        player.play()
+        player.playImmediately(atRate: playbackRate)
     }
 
     func play() {
-        player.play()
+        player.playImmediately(atRate: playbackRate)
     }
 
     func pause() {
@@ -48,6 +53,22 @@ final class AVPlaybackEngine: PlaybackEngine {
 
     func setVolume(_ volume: Float) {
         player.volume = min(max(volume, 0), 1)
+    }
+
+    func setMuted(_ isMuted: Bool) {
+        player.isMuted = isMuted
+    }
+
+    func setPlaybackRate(_ rate: Float) {
+        playbackRate = min(max(rate, 0.25), 2)
+        if player.rate != 0 {
+            player.rate = playbackRate
+        }
+    }
+
+    func setVideoScalingMode(_ mode: VideoScalingMode) {
+        videoScalingMode = mode
+        playerView.videoGravity = mode == .fit ? .resizeAspect : .resizeAspectFill
     }
 
     private func finiteSeconds(_ value: Double?) -> TimeInterval {

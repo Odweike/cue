@@ -5,6 +5,7 @@ import SwiftUI
 struct FloatingControlBar: View {
     let viewModel: PlayerViewModel
     private let refreshTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
+    @State private var showsSettings = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -83,11 +84,15 @@ struct FloatingControlBar: View {
             .disabled(true)
             .help("Subtitles — coming next")
 
-            Button(action: {}) {
+            Button {
+                showsSettings.toggle()
+            } label: {
                 Image(systemName: "ellipsis.circle")
             }
-            .disabled(true)
-            .help("Settings — coming next")
+            .help("Playback Settings")
+            .popover(isPresented: $showsSettings, arrowEdge: .leading) {
+                PlaybackSettingsPanel(viewModel: viewModel)
+            }
         }
         .font(.system(size: 21, weight: .medium))
         .buttonStyle(.plain)

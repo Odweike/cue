@@ -45,4 +45,19 @@ final class PlayerViewModel {
         playbackEngine.setVolume(volume)
         refreshPlaybackState()
     }
+
+    func setMuted(_ isMuted: Bool) {
+        playbackEngine.setMuted(isMuted)
+        refreshPlaybackState()
+    }
+
+    func setPlaybackRate(_ rate: Float) {
+        playbackEngine.setPlaybackRate(rate)
+        refreshPlaybackState()
+    }
+
+    func setVideoScalingMode(_ mode: VideoScalingMode) {
+        playbackEngine.setVideoScalingMode(mode)
+        refreshPlaybackState()
+    }
 }
