@@ -5,6 +5,7 @@ import SwiftUI
 struct FloatingControlBar: View {
     let viewModel: PlayerViewModel
     private let refreshTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
+    @State private var showsSubtitles = false
     @State private var showsSettings = false
 
     var body: some View {
@@ -78,11 +79,15 @@ struct FloatingControlBar: View {
             }
             .help("Full Screen")
 
-            Button(action: {}) {
+            Button {
+                showsSubtitles.toggle()
+            } label: {
                 Image(systemName: "captions.bubble")
             }
-            .disabled(true)
-            .help("Subtitles — coming next")
+            .help("Subtitles")
+            .popover(isPresented: $showsSubtitles, arrowEdge: .leading) {
+                SubtitleTracksPanel(viewModel: viewModel)
+            }
 
             Button {
                 showsSettings.toggle()
