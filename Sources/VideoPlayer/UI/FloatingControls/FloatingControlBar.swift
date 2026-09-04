@@ -219,8 +219,9 @@ struct FloatingControlsOverlay: View {
 
     private func resizeHandle(in availableSize: CGSize) -> some View {
         Color.clear
-            .frame(width: 24, height: 24)
+            .frame(width: 28, height: 28)
             .contentShape(Rectangle())
+            .pointerStyle(.frameResize(position: .bottomTrailing))
             .gesture(resizeGesture(in: availableSize))
             .accessibilityHidden(true)
             .help("Drag to resize")
@@ -251,15 +252,18 @@ struct FloatingControlsOverlay: View {
     }
 
     private func panelSize(in availableSize: CGSize) -> CGSize {
-        CGSize(
-            width: min(max(storedWidth + resizeOffset.width, 440), max(availableSize.width - 32, 440)),
-            height: min(max(storedHeight + resizeOffset.height, 112), 176)
+        let maximumWidth = min(max(availableSize.width - 32, 500), 760)
+
+        return CGSize(
+            width: min(max(storedWidth + resizeOffset.width, 500), maximumWidth),
+            height: min(max(storedHeight + resizeOffset.height, 116), 168)
         )
     }
 
     private func keepPanelVisible(in availableSize: CGSize) {
-        storedWidth = min(max(storedWidth, 440), max(availableSize.width - 32, 440))
-        storedHeight = min(max(storedHeight, 112), 176)
+        let maximumWidth = min(max(availableSize.width - 32, 500), 760)
+        storedWidth = min(max(storedWidth, 500), maximumWidth)
+        storedHeight = min(max(storedHeight, 116), 168)
 
         let maxHorizontalOffset = max((availableSize.width - storedWidth) / 2 - 16, 0)
         let maximumUpwardOffset = max(availableSize.height - storedHeight - 48, 0)
