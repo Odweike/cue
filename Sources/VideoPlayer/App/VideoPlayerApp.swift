@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct VoxFrameApp: App {
+struct CueApp: App {
     @State private var viewModel: PlayerViewModel
 
     init() {
@@ -10,7 +10,7 @@ struct VoxFrameApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("VoxFrame") {
+        WindowGroup("Cue") {
             PlayerRootView(viewModel: viewModel)
                 .frame(minWidth: 720, minHeight: 440)
         }

@@ -22,7 +22,10 @@ struct PlayerRootView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: viewModel.currentURL)
-        .navigationTitle(viewModel.currentURL?.lastPathComponent ?? "VoxFrame")
+        .onOpenURL { url in
+            viewModel.open(url)
+        }
+        .navigationTitle(viewModel.currentURL?.lastPathComponent ?? "Cue")
     }
 }
 

@@ -10,7 +10,7 @@ let baseSettings: [String: SettingValue] = [
 ]
 
 var appSettings = baseSettings
-appSettings["PRODUCT_NAME"] = "VoxFrame"
+appSettings["PRODUCT_NAME"] = "Cue"
 appSettings["EXECUTABLE_NAME"] = "VideoPlayer"
 appSettings["PRODUCT_MODULE_NAME"] = "VideoPlayer"
 
@@ -29,10 +29,18 @@ let project = Project(
             bundleId: "dev.maxim.videoplayer",
             deploymentTargets: .macOS("26.0"),
             infoPlist: .extendingDefault(with: [
-                "CFBundleDisplayName": "VoxFrame",
-                "CFBundleName": "VoxFrame",
+                "CFBundleDisplayName": "Cue",
+                "CFBundleName": "Cue",
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
+                "CFBundleDocumentTypes": .array([
+                    .dictionary([
+                        "CFBundleTypeName": .string("Video"),
+                        "CFBundleTypeRole": .string("Viewer"),
+                        "LSHandlerRank": .string("Owner"),
+                        "LSItemContentTypes": .array([.string("public.movie")])
+                    ])
+                ]),
                 "LSApplicationCategoryType": "public.app-category.video"
             ]),
             sources: ["Sources/VideoPlayer/**"],

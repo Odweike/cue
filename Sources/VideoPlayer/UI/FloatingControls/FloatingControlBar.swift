@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import SwiftUI
 
@@ -6,37 +7,24 @@ struct FloatingControlBar: View {
     private let refreshTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(spacing: 10) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 16) {
-                    volumeControl
-                    Spacer(minLength: 12)
-                    playbackButtons
-                    Spacer(minLength: 12)
-                    fileName
-                }
-
-                HStack(spacing: 12) {
-                    compactVolumeControl
-                    Spacer(minLength: 4)
-                    playbackButtons
-                }
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                volumeControl
+                Spacer(minLength: 8)
+                playbackButtons
+                Spacer(minLength: 8)
+                trailingActions
             }
 
             timeline
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 14)
+        .foregroundStyle(.white)
         .onReceive(refreshTimer) { _ in
             viewModel.refreshPlaybackState()
         }
-    }
-
-    private var fileName: some View {
-        Text(viewModel.currentURL?.lastPathComponent ?? "")
-            .font(.caption)
-            .lineLimit(1)
-            .frame(maxWidth: 150, alignment: .trailing)
     }
 
     private var volumeControl: some View {
@@ -50,31 +38,17 @@ struct FloatingControlBar: View {
                 ),
                 in: 0...1
             )
-            .frame(width: 90)
+            .tint(.blue)
+            .frame(minWidth: 48, maxWidth: 82)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Volume")
-    }
-
-    private var compactVolumeControl: some View {
-        HStack(spacing: 6) {
-            Image(systemName: volumeSymbol)
-            Slider(
-                value: Binding(
-                    get: { Double(viewModel.playbackState.volume) },
-                    set: { viewModel.setVolume(Float($0)) }
-                ),
-                in: 0...1
-            )
-            .frame(width: 64)
-        }
+        .frame(maxWidth: 120)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Volume")
     }
 
     private var playbackButtons: some View {
-        HStack(spacing: 18) {
-            controlButton("gobackward.10", label: "Back 10 seconds") {
+        HStack(spacing: 24) {
+            controlButton("backward.fill", size: 27, label: "Back 10 seconds") {
                 viewModel.skip(by: -10)
             }
 
@@ -82,23 +56,50 @@ struct FloatingControlBar: View {
                 viewModel.togglePlayback()
             } label: {
                 Image(systemName: viewModel.playbackState.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.title2)
-                    .frame(width: 34, height: 34)
+                    .font(.system(size: 36, weight: .medium))
+                    .frame(width: 46, height: 46)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(viewModel.playbackState.isPlaying ? "Pause" : "Play")
 
-            controlButton("goforward.10", label: "Forward 10 seconds") {
+            controlButton("forward.fill", size: 27, label: "Forward 10 seconds") {
                 viewModel.skip(by: 10)
             }
         }
     }
 
+    private var trailingActions: some View {
+        HStack(spacing: 15) {
+            Button {
+                NSApp.keyWindow?.toggleFullScreen(nil)
+            } label: {
+                Image(systemName: "pip.enter")
+            }
+            .help("Full Screen")
+
+            Button(action: {}) {
+                Image(systemName: "captions.bubble")
+            }
+            .disabled(true)
+            .help("Subtitles — coming next")
+
+            Button(action: {}) {
+                Image(systemName: "ellipsis.circle")
+            }
+            .disabled(true)
+            .help("Settings — coming next")
+        }
+        .font(.system(size: 21, weight: .medium))
+        .buttonStyle(.plain)
+        .frame(maxWidth: 100, alignment: .trailing)
+    }
+
     private var timeline: some View {
         HStack(spacing: 10) {
             Text(format(viewModel.playbackState.currentTime))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .frame(width: 48, alignment: .trailing)
+                .frame(width: 62, alignment: .leading)
 
             Slider(
                 value: Binding(
@@ -107,13 +108,14 @@ struct FloatingControlBar: View {
                 ),
                 in: 0...max(viewModel.playbackState.duration, 0.01)
             )
+            .tint(.white.opacity(0.9))
             .accessibilityLabel("Timeline")
 
             Text(format(viewModel.playbackState.duration))
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .frame(width: 48, alignment: .leading)
+                .frame(width: 62, alignment: .trailing)
         }
-        .font(.caption)
     }
 
     private var volumeSymbol: String {
@@ -126,13 +128,14 @@ struct FloatingControlBar: View {
 
     private func controlButton(
         _ systemName: String,
+        size: CGFloat,
         label: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.title3)
-                .frame(width: 28, height: 28)
+                .font(.system(size: size, weight: .medium))
+                .frame(width: 34, height: 42)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -154,8 +157,8 @@ struct FloatingControlsOverlay: View {
 
     @AppStorage("FloatingControlsOffsetX") private var storedOffsetX = 0.0
     @AppStorage("FloatingControlsOffsetY") private var storedOffsetY = 0.0
-    @AppStorage("FloatingControlsWidth") private var storedWidth = 520.0
-    @AppStorage("FloatingControlsHeight") private var storedHeight = 96.0
+    @AppStorage("CueControlsWidth") private var storedWidth = 620.0
+    @AppStorage("CueControlsHeight") private var storedHeight = 132.0
     @GestureState private var moveOffset = CGSize.zero
     @GestureState private var resizeOffset = CGSize.zero
 
@@ -169,13 +172,9 @@ struct FloatingControlsOverlay: View {
                 FloatingControlBar(viewModel: viewModel)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .background(
-                        .ultraThinMaterial,
+                        Color(red: 0.51, green: 0.51, blue: 0.47),
                         in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                     )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(.white.opacity(0.14), lineWidth: 1)
-                    }
                     .overlay(alignment: .top) {
                         moveHandle(in: geometry.size)
                     }
@@ -189,6 +188,7 @@ struct FloatingControlsOverlay: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 24)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onAppear {
                 keepPanelVisible(in: geometry.size)
             }
@@ -199,14 +199,13 @@ struct FloatingControlsOverlay: View {
     }
 
     private func moveHandle(in availableSize: CGSize) -> some View {
-        Capsule()
-            .fill(.white.opacity(0.35))
-            .frame(width: 38, height: 4)
-            .padding(.top, 7)
-            .frame(width: 90, height: 22)
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 20)
             .contentShape(Rectangle())
             .gesture(moveGesture(in: availableSize))
             .accessibilityLabel("Move controls")
+            .help("Drag to move")
     }
 
     private func resizeHandle(in availableSize: CGSize) -> some View {
@@ -246,14 +245,14 @@ struct FloatingControlsOverlay: View {
 
     private func panelSize(in availableSize: CGSize) -> CGSize {
         CGSize(
-            width: min(max(storedWidth + resizeOffset.width, 380), max(availableSize.width - 32, 380)),
-            height: min(max(storedHeight + resizeOffset.height, 88), 150)
+            width: min(max(storedWidth + resizeOffset.width, 440), max(availableSize.width - 32, 440)),
+            height: min(max(storedHeight + resizeOffset.height, 112), 176)
         )
     }
 
     private func keepPanelVisible(in availableSize: CGSize) {
-        storedWidth = min(max(storedWidth, 380), max(availableSize.width - 32, 380))
-        storedHeight = min(max(storedHeight, 88), 150)
+        storedWidth = min(max(storedWidth, 440), max(availableSize.width - 32, 440))
+        storedHeight = min(max(storedHeight, 112), 176)
 
         let maxHorizontalOffset = max((availableSize.width - storedWidth) / 2 - 16, 0)
         let maximumUpwardOffset = max(availableSize.height - storedHeight - 48, 0)

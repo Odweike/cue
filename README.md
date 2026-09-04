@@ -1,4 +1,4 @@
-# VoxFrame
+# Cue
 
 Native macOS video player built with SwiftUI and AppKit.
 
