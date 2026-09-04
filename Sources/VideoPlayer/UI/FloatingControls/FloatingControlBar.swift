@@ -171,10 +171,14 @@ struct FloatingControlsOverlay: View {
 
                 FloatingControlBar(viewModel: viewModel)
                     .frame(width: panelSize.width, height: panelSize.height)
-                    .background(
-                        Color(red: 0.51, green: 0.51, blue: 0.47),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    )
+                    .background {
+                        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        shape
+                            .fill(.regularMaterial)
+                            .overlay {
+                                shape.fill(.black.opacity(0.22))
+                            }
+                    }
                     .overlay(alignment: .top) {
                         moveHandle(in: geometry.size)
                     }
@@ -209,18 +213,16 @@ struct FloatingControlsOverlay: View {
     }
 
     private func resizeHandle(in availableSize: CGSize) -> some View {
-        Image(systemName: "arrow.down.right.and.arrow.up.left")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.65))
-            .frame(width: 28, height: 28)
+        Color.clear
+            .frame(width: 24, height: 24)
             .contentShape(Rectangle())
             .gesture(resizeGesture(in: availableSize))
-            .accessibilityLabel("Resize controls")
+            .accessibilityHidden(true)
             .help("Drag to resize")
     }
 
     private func moveGesture(in availableSize: CGSize) -> some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .updating($moveOffset) { value, state, _ in
                 state = value.translation
             }
@@ -232,7 +234,7 @@ struct FloatingControlsOverlay: View {
     }
 
     private func resizeGesture(in availableSize: CGSize) -> some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .updating($resizeOffset) { value, state, _ in
                 state = value.translation
             }
