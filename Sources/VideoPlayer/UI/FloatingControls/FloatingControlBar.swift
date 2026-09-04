@@ -49,8 +49,8 @@ struct FloatingControlBar: View {
     }
 
     private var playbackButtons: some View {
-        HStack(spacing: 24) {
-            controlButton("backward.fill", size: 27, label: "Back 10 seconds") {
+        HStack(spacing: 20) {
+            controlButton("backward.fill", size: 22, label: "Back 10 seconds") {
                 viewModel.skip(by: -10)
             }
 
@@ -58,13 +58,13 @@ struct FloatingControlBar: View {
                 viewModel.togglePlayback()
             } label: {
                 Image(systemName: viewModel.playbackState.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 36, weight: .medium))
-                    .frame(width: 46, height: 46)
+                    .font(.system(size: 29, weight: .medium))
+                    .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(viewModel.playbackState.isPlaying ? "Pause" : "Play")
 
-            controlButton("forward.fill", size: 27, label: "Forward 10 seconds") {
+            controlButton("forward.fill", size: 22, label: "Forward 10 seconds") {
                 viewModel.skip(by: 10)
             }
         }
@@ -99,7 +99,7 @@ struct FloatingControlBar: View {
                 PlaybackSettingsPanel(viewModel: viewModel)
             }
         }
-        .font(.system(size: 21, weight: .medium))
+        .font(.system(size: 17, weight: .medium))
         .buttonStyle(.plain)
         .frame(maxWidth: 100, alignment: .trailing)
     }
@@ -145,7 +145,7 @@ struct FloatingControlBar: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .medium))
-                .frame(width: 34, height: 42)
+                .frame(width: 28, height: 34)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
@@ -165,6 +165,11 @@ struct FloatingControlBar: View {
 struct FloatingControlsOverlay: View {
     let viewModel: PlayerViewModel
 
+    private static let minimumPanelWidth: CGFloat = 360
+    private static let minimumPanelHeight: CGFloat = 84
+    private static let regularPanelWidth: CGFloat = 500
+    private static let regularPanelHeight: CGFloat = 116
+
     @AppStorage("FloatingControlsOffsetX") private var storedOffsetX = 0.0
     @AppStorage("FloatingControlsOffsetY") private var storedOffsetY = 0.0
     @AppStorage("CueControlsWidth") private var storedWidth = 620.0
@@ -180,11 +185,17 @@ struct FloatingControlsOverlay: View {
                 height: panelSize.height - storedHeight
             )
             let resizeOffsetAdjustment = Self.offsetAdjustment(for: resizeDelta)
+            let controlsScale = Self.controlsScale(for: panelSize)
 
             VStack {
                 Spacer()
 
                 FloatingControlBar(viewModel: viewModel)
+                    .frame(
+                        width: panelSize.width / controlsScale,
+                        height: panelSize.height / controlsScale
+                    )
+                    .scaleEffect(controlsScale)
                     .frame(width: panelSize.width, height: panelSize.height)
                     .background {
                         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -275,6 +286,16 @@ struct FloatingControlsOverlay: View {
         CGSize(width: sizeDelta.width / 2, height: sizeDelta.height)
     }
 
+    static func controlsScale(for panelSize: CGSize) -> CGFloat {
+        min(
+            max(
+                min(panelSize.width / regularPanelWidth, panelSize.height / regularPanelHeight),
+                0.72
+            ),
+            1
+        )
+    }
+
     private func panelSize(in availableSize: CGSize) -> CGSize {
         resizedPanelSize(for: resizeOffset, in: availableSize)
     }
@@ -282,19 +303,25 @@ struct FloatingControlsOverlay: View {
     private func resizedPanelSize(for translation: CGSize, in availableSize: CGSize) -> CGSize {
         let currentLeft = (availableSize.width - storedWidth) / 2 + storedOffsetX
         let currentTop = availableSize.height - 24 - storedHeight + storedOffsetY
-        let maximumWidth = min(max(availableSize.width - 16 - currentLeft, 500), 760)
-        let maximumHeight = min(max(availableSize.height - 16 - currentTop, 116), 168)
+        let maximumWidth = min(
+            max(availableSize.width - 16 - currentLeft, Self.minimumPanelWidth),
+            760
+        )
+        let maximumHeight = min(
+            max(availableSize.height - 16 - currentTop, Self.minimumPanelHeight),
+            168
+        )
 
         return CGSize(
-            width: min(max(storedWidth + translation.width, 500), maximumWidth),
-            height: min(max(storedHeight + translation.height, 116), maximumHeight)
+            width: min(max(storedWidth + translation.width, Self.minimumPanelWidth), maximumWidth),
+            height: min(max(storedHeight + translation.height, Self.minimumPanelHeight), maximumHeight)
         )
     }
 
     private func keepPanelVisible(in availableSize: CGSize) {
-        let maximumWidth = min(max(availableSize.width - 32, 500), 760)
-        storedWidth = min(max(storedWidth, 500), maximumWidth)
-        storedHeight = min(max(storedHeight, 116), 168)
+        let maximumWidth = min(max(availableSize.width - 32, Self.minimumPanelWidth), 760)
+        storedWidth = min(max(storedWidth, Self.minimumPanelWidth), maximumWidth)
+        storedHeight = min(max(storedHeight, Self.minimumPanelHeight), 168)
 
         let maxHorizontalOffset = max((availableSize.width - storedWidth) / 2 - 16, 0)
         let maximumUpwardOffset = max(availableSize.height - storedHeight - 48, 0)

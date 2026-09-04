@@ -28,4 +28,15 @@ final class FloatingControlsGeometryTests: XCTestCase {
         XCTAssertEqual(resizedTopLeading.x, currentTopLeading.x)
         XCTAssertEqual(resizedTopLeading.y, currentTopLeading.y)
     }
+
+    func testControlsShrinkOnlyForCompactPanel() {
+        XCTAssertEqual(
+            FloatingControlsOverlay.controlsScale(for: CGSize(width: 500, height: 116)),
+            1
+        )
+        XCTAssertEqual(
+            FloatingControlsOverlay.controlsScale(for: CGSize(width: 360, height: 84)),
+            0.72
+        )
+    }
 }
