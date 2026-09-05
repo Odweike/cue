@@ -99,9 +99,16 @@ final class PlayerViewModelTests: XCTestCase {
         defer { userDefaults.removePersistentDomain(forName: suiteName) }
         let style = SubtitleStyle(
             fontSize: 36,
+            fontDesign: .rounded,
+            fontWeight: .bold,
             textColor: .cyan,
+            outlineColor: .blue,
+            outlineWidth: 2,
+            backgroundColor: .red,
             backgroundOpacity: 0.4,
-            bottomPadding: 210
+            position: .top,
+            verticalOffset: 210,
+            alignment: .leading
         )
 
         let firstViewModel = PlayerViewModel(
@@ -115,6 +122,16 @@ final class PlayerViewModelTests: XCTestCase {
         )
 
         XCTAssertEqual(restoredViewModel.subtitleStyles[1], style)
+    }
+
+    func testLegacySubtitleStyleKeepsItsSavedHeight() throws {
+        let data = Data(#"{"fontSize":30,"textColor":"white","backgroundOpacity":0.5,"bottomPadding":210}"#.utf8)
+
+        let style = try JSONDecoder().decode(SubtitleStyle.self, from: data)
+
+        XCTAssertEqual(style.verticalOffset, 210)
+        XCTAssertEqual(style.position, .custom)
+        XCTAssertEqual(style.fontWeight, .semibold)
     }
 
     func testProgressiveTranscriptionAddsCuesAsTheyArrive() async {

@@ -65,6 +65,18 @@ struct SubtitleStyleEditor: View {
             .pickerStyle(.segmented)
 
             Section("Text") {
+                Picker("Font", selection: fontDesign) {
+                    ForEach(SubtitleFontDesign.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+
+                Picker("Weight", selection: fontWeight) {
+                    ForEach(SubtitleFontWeight.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+
                 LabeledContent("Size") {
                     HStack {
                         Slider(value: fontSize, in: 14...52, step: 1)
@@ -75,25 +87,58 @@ struct SubtitleStyleEditor: View {
                 }
 
                 Picker("Color", selection: textColor) {
-                    ForEach(SubtitleTextColor.allCases) { option in
+                    colorOptions()
+                }
+            }
+
+            Section("Outline") {
+                Picker("Color", selection: outlineColor) {
+                    colorOptions()
+                }
+
+                LabeledContent("Width") {
+                    HStack {
+                        Slider(value: outlineWidth, in: 0...4, step: 0.5)
+                        Text(String(format: "%.1f", style.wrappedValue.outlineWidth))
+                            .monospacedDigit()
+                            .frame(width: 28, alignment: .trailing)
+                    }
+                }
+            }
+
+            Section("Background") {
+                Picker("Color", selection: backgroundColor) {
+                    colorOptions()
+                }
+
+                LabeledContent("Opacity") {
+                    Slider(value: backgroundOpacity, in: 0...0.9, step: 0.05)
+                }
+            }
+
+            Section("Placement") {
+                Picker("Position", selection: position) {
+                    ForEach(SubtitlePosition.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Alignment", selection: alignment) {
+                    ForEach(SubtitleAlignment.allCases) { option in
                         HStack {
-                            Circle()
-                                .fill(option.color)
-                                .frame(width: 10, height: 10)
+                            Image(systemName: alignmentIcon(option))
                             Text(option.title)
                         }
                         .tag(option)
                     }
                 }
-            }
+                .pickerStyle(.segmented)
 
-            Section("Placement") {
-                LabeledContent("Background") {
-                    Slider(value: backgroundOpacity, in: 0...0.9, step: 0.05)
-                }
-
-                LabeledContent("Height") {
-                    Slider(value: bottomPadding, in: 60...360, step: 5)
+                if style.wrappedValue.position == .custom {
+                    LabeledContent("Height") {
+                        Slider(value: verticalOffset, in: 20...360, step: 5)
+                    }
                 }
             }
 
@@ -151,10 +196,45 @@ struct SubtitleStyleEditor: View {
         )
     }
 
-    private var textColor: Binding<SubtitleTextColor> {
+    private var fontDesign: Binding<SubtitleFontDesign> {
+        Binding(
+            get: { style.wrappedValue.fontDesign },
+            set: { style.wrappedValue.fontDesign = $0 }
+        )
+    }
+
+    private var fontWeight: Binding<SubtitleFontWeight> {
+        Binding(
+            get: { style.wrappedValue.fontWeight },
+            set: { style.wrappedValue.fontWeight = $0 }
+        )
+    }
+
+    private var textColor: Binding<SubtitleColor> {
         Binding(
             get: { style.wrappedValue.textColor },
             set: { style.wrappedValue.textColor = $0 }
+        )
+    }
+
+    private var outlineColor: Binding<SubtitleColor> {
+        Binding(
+            get: { style.wrappedValue.outlineColor },
+            set: { style.wrappedValue.outlineColor = $0 }
+        )
+    }
+
+    private var outlineWidth: Binding<Double> {
+        Binding(
+            get: { style.wrappedValue.outlineWidth },
+            set: { style.wrappedValue.outlineWidth = $0 }
+        )
+    }
+
+    private var backgroundColor: Binding<SubtitleColor> {
+        Binding(
+            get: { style.wrappedValue.backgroundColor },
+            set: { style.wrappedValue.backgroundColor = $0 }
         )
     }
 
@@ -165,10 +245,45 @@ struct SubtitleStyleEditor: View {
         )
     }
 
-    private var bottomPadding: Binding<Double> {
+    private var position: Binding<SubtitlePosition> {
         Binding(
-            get: { style.wrappedValue.bottomPadding },
-            set: { style.wrappedValue.bottomPadding = $0 }
+            get: { style.wrappedValue.position },
+            set: { style.wrappedValue.position = $0 }
         )
+    }
+
+    private var verticalOffset: Binding<Double> {
+        Binding(
+            get: { style.wrappedValue.verticalOffset },
+            set: { style.wrappedValue.verticalOffset = $0 }
+        )
+    }
+
+    private var alignment: Binding<SubtitleAlignment> {
+        Binding(
+            get: { style.wrappedValue.alignment },
+            set: { style.wrappedValue.alignment = $0 }
+        )
+    }
+
+    @ViewBuilder
+    private func colorOptions() -> some View {
+        ForEach(SubtitleColor.allCases) { option in
+            HStack {
+                Circle()
+                    .fill(option.color)
+                    .frame(width: 10, height: 10)
+                Text(option.title)
+            }
+            .tag(option)
+        }
+    }
+
+    private func alignmentIcon(_ alignment: SubtitleAlignment) -> String {
+        switch alignment {
+        case .leading: "text.alignleft"
+        case .center: "text.aligncenter"
+        case .trailing: "text.alignright"
+        }
     }
 }
