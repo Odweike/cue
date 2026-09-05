@@ -20,6 +20,12 @@ let project = Project(
         disableBundleAccessors: true,
         disableSynthesizedResourceAccessors: true
     ),
+    packages: [
+        .remote(
+            url: "https://github.com/mpvkit/MPVKit.git",
+            requirement: .exact("1.0.0")
+        )
+    ],
     settings: .settings(base: baseSettings),
     targets: [
         .target(
@@ -31,6 +37,7 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "Cue",
                 "CFBundleName": "Cue",
+                "NSMainStoryboardFile": "",
                 "NSSpeechRecognitionUsageDescription": "Cue uses on-device speech recognition to generate subtitles for videos you choose.",
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
@@ -39,14 +46,30 @@ let project = Project(
                         "CFBundleTypeName": .string("Video"),
                         "CFBundleTypeRole": .string("Viewer"),
                         "LSHandlerRank": .string("Owner"),
-                        "LSItemContentTypes": .array([.string("public.movie")])
+                        "LSItemContentTypes": .array([
+                            .string("public.movie"),
+                            .string("org.matroska.mkv")
+                        ])
+                    ])
+                ]),
+                "UTImportedTypeDeclarations": .array([
+                    .dictionary([
+                        "UTTypeConformsTo": .array([.string("public.movie")]),
+                        "UTTypeDescription": .string("Matroska Video"),
+                        "UTTypeIdentifier": .string("org.matroska.mkv"),
+                        "UTTypeTagSpecification": .dictionary([
+                            "public.filename-extension": .array([.string("mkv")]),
+                            "public.mime-type": .string("video/x-matroska")
+                        ])
                     ])
                 ]),
                 "LSApplicationCategoryType": "public.app-category.video"
             ]),
             sources: ["Sources/VideoPlayer/**"],
             resources: ["Sources/VideoPlayer/Resources/**"],
-            dependencies: [],
+            dependencies: [
+                .package(product: "MPVKit")
+            ],
             settings: .settings(base: appSettings)
         ),
         .target(

@@ -5,7 +5,7 @@ struct CueApp: App {
     @State private var viewModel: PlayerViewModel
 
     init() {
-        let engine = AVPlaybackEngine()
+        let engine = MPVPlaybackEngine()
         _viewModel = State(initialValue: PlayerViewModel(playbackEngine: engine))
     }
 
