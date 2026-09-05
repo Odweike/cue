@@ -13,6 +13,7 @@ Native macOS video player built with SwiftUI and AppKit.
 - Customize and persist independent subtitle styles for the first and second visible tracks.
 - Generate time-coded subtitles locally with Apple Speech and save them beside the video as SRT.
 - Recognize subtitles progressively while watching, including restart after seeking.
+- Review bundled open-source notices and LGPL terms from the Help menu.
 
 ## Run
 

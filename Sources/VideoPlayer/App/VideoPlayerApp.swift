@@ -22,6 +22,13 @@ struct CueApp: App {
         .defaultSize(width: 1_000, height: 640)
         .commands {
             OpenVideoCommands(viewModel: viewModel)
+            LicensesCommands()
         }
+
+        Window("Open Source Licenses", id: "licenses") {
+            LicensesView()
+                .frame(minWidth: 560, minHeight: 440)
+        }
+        .defaultSize(width: 680, height: 640)
     }
 }

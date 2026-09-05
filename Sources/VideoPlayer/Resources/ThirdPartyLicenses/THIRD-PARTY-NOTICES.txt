@@ -1,0 +1,16 @@
+Cue uses the following open-source components through MPVKit 1.0.0:
+
+MPVKit — GNU Lesser General Public License v3.0
+https://github.com/mpvkit/MPVKit
+
+mpv 0.41.0 — GNU Lesser General Public License v2.1 or later
+https://mpv.io
+
+FFmpeg 8.1.2 — GNU Lesser General Public License v2.1 or later
+https://ffmpeg.org
+
+libass 0.17.5 — ISC License
+https://github.com/libass/libass
+
+The complete LGPL v3.0 text distributed by MPVKit is included with Cue as
+MPVKit-LGPL-3.0.txt. Copyright remains with each project and its contributors.
