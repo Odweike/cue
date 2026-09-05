@@ -9,6 +9,7 @@ struct PlayerRootView: View {
                 .ignoresSafeArea()
 
             AVPlayerContainerView(playerView: viewModel.playbackEngine.renderView)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if viewModel.currentURL == nil {
                 WelcomeView {

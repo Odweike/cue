@@ -3,7 +3,7 @@ import Libmpv
 
 @MainActor
 final class MPVPlaybackEngine: PlaybackEngine {
-    private let playerView = MPVMetalView()
+    private let playerView = MPVOpenGLView(frame: .zero)
     nonisolated(unsafe) private let context: OpaquePointer
     private let eventDrainer: MPVEventDrainer
     private var playbackRate: Float = 1
@@ -40,16 +40,17 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setOption("input-media-keys", to: "no")
         setOption("ytdl", to: "no")
         setOption("keep-open", to: "yes")
-        setOption("vo", to: "gpu-next")
-        setOption("gpu-api", to: "vulkan")
-        setOption("gpu-context", to: "moltenvk")
-        setOption("hwdec", to: "videotoolbox")
-
-        var windowID = Int64(Int(bitPattern: Unmanaged.passUnretained(playerView.metalLayer).toOpaque()))
-        mpv_set_option(context, "wid", MPV_FORMAT_INT64, &windowID)
+        setOption("keepaspect", to: "yes")
+        setOption("video-unscaled", to: "no")
+        setOption("panscan", to: "0")
+        setOption("video-align-x", to: "0")
+        setOption("video-align-y", to: "0")
+        setOption("vo", to: "libmpv")
+        setOption("hwdec", to: "videotoolbox-copy")
 
         let status = mpv_initialize(context)
         precondition(status >= 0, "Could not initialize mpv: \(Self.errorMessage(for: status))")
+        playerView.attach(to: context)
 
         mpv_set_wakeup_callback(
             context,

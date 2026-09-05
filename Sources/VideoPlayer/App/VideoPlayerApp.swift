@@ -10,9 +10,14 @@ struct CueApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Cue") {
+        Window("Cue", id: "main") {
             PlayerRootView(viewModel: viewModel)
-                .frame(minWidth: 720, minHeight: 440)
+                .frame(
+                    minWidth: 720,
+                    maxWidth: .infinity,
+                    minHeight: 440,
+                    maxHeight: .infinity
+                )
         }
         .defaultSize(width: 1_000, height: 640)
         .commands {
