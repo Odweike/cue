@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerRootView: View {
     let viewModel: PlayerViewModel
+    @State private var isDropTargeted = false
 
     var body: some View {
         ZStack {
@@ -28,8 +29,25 @@ struct PlayerRootView: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: viewModel.currentURL)
-        .onOpenURL { url in
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(.tint, lineWidth: 3)
+                    .padding(8)
+                    .allowsHitTesting(false)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first(where: VideoFilePicker.canOpen) else { return false }
             viewModel.open(url)
+            return true
+        } isTargeted: { isTargeted in
+            isDropTargeted = isTargeted
+        }
+        .onOpenURL { url in
+            if VideoFilePicker.canOpen(url) {
+                viewModel.open(url)
+            }
         }
         .navigationTitle(viewModel.currentURL?.lastPathComponent ?? "Cue")
     }

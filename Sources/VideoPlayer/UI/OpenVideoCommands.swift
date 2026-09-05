@@ -4,6 +4,12 @@ import UniformTypeIdentifiers
 
 @MainActor
 enum VideoFilePicker {
+    static func canOpen(_ url: URL) -> Bool {
+        guard url.isFileURL else { return false }
+        return url.pathExtension.lowercased() == "mkv"
+            || UTType(filenameExtension: url.pathExtension)?.conforms(to: .movie) == true
+    }
+
     static func chooseVideo() -> URL? {
         let panel = NSOpenPanel()
         panel.title = "Open Video"

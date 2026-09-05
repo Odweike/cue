@@ -15,6 +15,13 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentURL, url)
     }
 
+    func testVideoFileValidationAcceptsMoviesAndRejectsOtherFiles() {
+        XCTAssertTrue(VideoFilePicker.canOpen(URL(fileURLWithPath: "/tmp/movie.mkv")))
+        XCTAssertTrue(VideoFilePicker.canOpen(URL(fileURLWithPath: "/tmp/movie.mp4")))
+        XCTAssertFalse(VideoFilePicker.canOpen(URL(fileURLWithPath: "/tmp/notes.txt")))
+        XCTAssertFalse(VideoFilePicker.canOpen(URL(string: "https://example.com/movie.mp4")!))
+    }
+
     func testControlsAreForwardedToPlaybackEngine() {
         let engine = PlaybackEngineSpy()
         let viewModel = PlayerViewModel(playbackEngine: engine)
