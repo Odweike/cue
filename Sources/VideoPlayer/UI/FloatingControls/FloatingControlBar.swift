@@ -31,8 +31,16 @@ struct FloatingControlBar: View {
 
     private var volumeControl: some View {
         HStack(spacing: 8) {
-            Image(systemName: volumeSymbol)
-                .frame(width: 18)
+            Button {
+                viewModel.toggleMuted()
+            } label: {
+                Image(systemName: volumeSymbol)
+                    .frame(width: 18)
+            }
+            .buttonStyle(.plain)
+            .help(viewModel.playbackState.isMuted ? "Unmute" : "Mute")
+            .accessibilityLabel(viewModel.playbackState.isMuted ? "Unmute" : "Mute")
+
             Slider(
                 value: Binding(
                     get: { Double(viewModel.playbackState.volume) },
@@ -129,7 +137,11 @@ struct FloatingControlBar: View {
     }
 
     private var volumeSymbol: String {
-        switch viewModel.playbackState.volume {
+        if viewModel.playbackState.isMuted {
+            return "speaker.slash.fill"
+        }
+
+        return switch viewModel.playbackState.volume {
         case 0: "speaker.slash.fill"
         case ..<0.5: "speaker.wave.1.fill"
         default: "speaker.wave.2.fill"

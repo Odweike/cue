@@ -75,6 +75,10 @@ final class PlayerViewModel {
         refreshPlaybackState()
     }
 
+    func toggleMuted() {
+        setMuted(!playbackState.isMuted)
+    }
+
     func setPlaybackRate(_ rate: Float) {
         playbackEngine.setPlaybackRate(rate)
         refreshPlaybackState()

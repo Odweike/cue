@@ -34,6 +34,23 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.skipInterval, 10)
     }
 
+    func testMuteTogglePreservesVolume() {
+        let engine = PlaybackEngineSpy()
+        engine.state.volume = 0.4
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        viewModel.refreshPlaybackState()
+
+        viewModel.toggleMuted()
+
+        XCTAssertTrue(viewModel.playbackState.isMuted)
+        XCTAssertEqual(viewModel.playbackState.volume, 0.4)
+
+        viewModel.toggleMuted()
+
+        XCTAssertFalse(viewModel.playbackState.isMuted)
+        XCTAssertEqual(viewModel.playbackState.volume, 0.4)
+    }
+
     func testSubtitleStylesPersistBetweenViewModels() {
         let suiteName = "PlayerViewModelTests.\(UUID().uuidString)"
         let userDefaults = UserDefaults(suiteName: suiteName)!
@@ -88,10 +105,12 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func setVolume(_ volume: Float) {
         self.volume = volume
+        state.volume = volume
     }
 
     func setMuted(_ isMuted: Bool) {
         self.isMuted = isMuted
+        state.isMuted = isMuted
     }
 
     func setPlaybackRate(_ rate: Float) {
