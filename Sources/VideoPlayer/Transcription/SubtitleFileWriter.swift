@@ -31,6 +31,10 @@ enum SubtitleFileWriter {
         .joined(separator: "\n\n") + "\n"
     }
 
+    static func writeSRT(_ cues: [SubtitleCue], to url: URL) throws {
+        try srtContents(for: cues).write(to: url, atomically: true, encoding: .utf8)
+    }
+
     private static func timestamp(_ time: TimeInterval) -> String {
         let milliseconds = max(Int((time * 1_000).rounded()), 0)
         let hours = milliseconds / 3_600_000

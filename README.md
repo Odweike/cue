@@ -10,6 +10,7 @@ Native macOS video player built with SwiftUI and AppKit.
 - Play MKV, MP4, MOV, and other common formats through the embedded LGPL build of libmpv.
 - Playback stays isolated behind `PlaybackEngine`, with the native AVFoundation engine retained as a fallback implementation.
 - Import and display up to two SRT, VTT, or ASS subtitle tracks at once.
+- Export any imported or generated subtitle track as SRT.
 - Customize and persist independent subtitle styles for the first and second visible tracks.
 - Generate time-coded subtitles locally with Apple Speech and save them beside the video as SRT.
 - Recognize subtitles progressively while watching, including restart after seeking.

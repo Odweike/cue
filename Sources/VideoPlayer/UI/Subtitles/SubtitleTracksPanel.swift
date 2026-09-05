@@ -14,11 +14,28 @@ struct SubtitleTracksPanel: View {
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(viewModel.subtitleTracks) { track in
-                    Toggle(track.name, isOn: Binding(
-                        get: { track.isEnabled },
-                        set: { viewModel.setSubtitleTrack(track.id, enabled: $0) }
-                    ))
-                    .lineLimit(1)
+                    HStack {
+                        Toggle(track.name, isOn: Binding(
+                            get: { track.isEnabled },
+                            set: { viewModel.setSubtitleTrack(track.id, enabled: $0) }
+                        ))
+                        .lineLimit(1)
+
+                        Spacer(minLength: 8)
+
+                        Button {
+                            do {
+                                _ = try SubtitleFilePicker.exportSRT(track)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Export as SRT")
+                        .accessibilityLabel("Export \(track.name) as SRT")
+                    }
                 }
             }
 
@@ -35,7 +52,7 @@ struct SubtitleTracksPanel: View {
         }
         .padding(16)
         .frame(width: 300)
-        .alert("Couldn’t Open Subtitles", isPresented: Binding(
+        .alert("Subtitle File Error", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
