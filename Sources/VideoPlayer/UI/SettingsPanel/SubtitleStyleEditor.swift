@@ -43,6 +43,18 @@ struct SubtitleStyleEditor: View {
                     }
                 }
 
+                Toggle("Recognize While Watching", isOn: progressiveTranscription)
+                    .disabled(
+                        viewModel.currentURL == nil
+                            || viewModel.supportedTranscriptionLocales.isEmpty
+                    )
+
+                if let message = viewModel.progressiveTranscriptionError {
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                }
+
                 transcriptionResult
             }
 
@@ -115,6 +127,13 @@ struct SubtitleStyleEditor: View {
         Binding(
             get: { viewModel.selectedTranscriptionLocaleIdentifier },
             set: { viewModel.selectTranscriptionLocale($0) }
+        )
+    }
+
+    private var progressiveTranscription: Binding<Bool> {
+        Binding(
+            get: { viewModel.isProgressiveTranscriptionEnabled },
+            set: { viewModel.setProgressiveTranscriptionEnabled($0) }
         )
     }
 

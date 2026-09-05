@@ -124,7 +124,12 @@ struct FloatingControlBar: View {
                     get: { viewModel.playbackState.currentTime },
                     set: { viewModel.seek(to: $0) }
                 ),
-                in: 0...max(viewModel.playbackState.duration, 0.01)
+                in: 0...max(viewModel.playbackState.duration, 0.01),
+                onEditingChanged: { isEditing in
+                    if !isEditing {
+                        viewModel.playbackPositionDidJump()
+                    }
+                }
             )
             .tint(.white.opacity(0.9))
             .accessibilityLabel("Timeline")

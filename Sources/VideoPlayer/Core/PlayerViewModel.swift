@@ -12,12 +12,17 @@ final class PlayerViewModel {
     private let userDefaults: UserDefaults
     private var transcriptionTask: Task<Void, Never>?
     private var transcriptionID: UUID?
+    private var progressiveTranscriptionTask: Task<Void, Never>?
+    private var progressiveTranscriptionID: UUID?
+    private var progressiveTrackID: UUID?
     private(set) var currentURL: URL?
     private(set) var playbackState = PlaybackState()
     private(set) var subtitleTracks: [SubtitleTrack] = []
     private(set) var subtitleStyles: [SubtitleStyle]
     private(set) var supportedTranscriptionLocales: [Locale] = []
     private(set) var transcriptionStatus = TranscriptionStatus.idle
+    private(set) var isProgressiveTranscriptionEnabled = false
+    private(set) var progressiveTranscriptionError: String?
     private(set) var selectedTranscriptionLocaleIdentifier: String
 
     init(
@@ -36,6 +41,7 @@ final class PlayerViewModel {
 
     func open(_ url: URL) {
         cancelTranscription()
+        setProgressiveTranscriptionEnabled(false)
         subtitleTracks.removeAll()
         playbackEngine.open(url)
         currentURL = url
@@ -63,6 +69,7 @@ final class PlayerViewModel {
     func skip(by interval: TimeInterval) {
         playbackEngine.skip(by: interval)
         refreshPlaybackState()
+        restartProgressiveTranscriptionIfNeeded()
     }
 
     func setVolume(_ volume: Float) {
@@ -150,8 +157,15 @@ final class PlayerViewModel {
 
     func selectTranscriptionLocale(_ identifier: String) {
         guard supportedTranscriptionLocales.contains(where: { $0.identifier == identifier }) else { return }
+        let shouldRestartProgressiveTranscription = isProgressiveTranscriptionEnabled
+        if shouldRestartProgressiveTranscription {
+            setProgressiveTranscriptionEnabled(false)
+        }
         selectedTranscriptionLocaleIdentifier = identifier
         userDefaults.set(identifier, forKey: Self.transcriptionLocaleKey)
+        if shouldRestartProgressiveTranscription {
+            setProgressiveTranscriptionEnabled(true)
+        }
     }
 
     func startTranscription() {
@@ -199,6 +213,87 @@ final class PlayerViewModel {
         transcriptionTask = nil
         transcriptionID = nil
         transcriptionStatus = .idle
+    }
+
+    func setProgressiveTranscriptionEnabled(_ isEnabled: Bool) {
+        guard isEnabled else {
+            progressiveTranscriptionTask?.cancel()
+            progressiveTranscriptionTask = nil
+            progressiveTranscriptionID = nil
+            if let progressiveTrackID {
+                subtitleTracks.removeAll { $0.id == progressiveTrackID }
+            }
+            progressiveTrackID = nil
+            isProgressiveTranscriptionEnabled = false
+            progressiveTranscriptionError = nil
+            return
+        }
+        guard currentURL != nil, !supportedTranscriptionLocales.isEmpty else { return }
+        isProgressiveTranscriptionEnabled = true
+        progressiveTranscriptionError = nil
+        restartProgressiveTranscription(at: playbackState.currentTime)
+    }
+
+    func playbackPositionDidJump() {
+        restartProgressiveTranscriptionIfNeeded()
+    }
+
+    private func restartProgressiveTranscriptionIfNeeded() {
+        guard isProgressiveTranscriptionEnabled else { return }
+        restartProgressiveTranscription(at: playbackState.currentTime)
+    }
+
+    private func restartProgressiveTranscription(at time: TimeInterval) {
+        guard let videoURL = currentURL else { return }
+        progressiveTranscriptionTask?.cancel()
+
+        let locale = Locale(identifier: selectedTranscriptionLocaleIdentifier)
+        let operationID = UUID()
+        let trackID = progressiveTrackID ?? UUID()
+        progressiveTranscriptionID = operationID
+        progressiveTrackID = trackID
+
+        if let index = subtitleTracks.firstIndex(where: { $0.id == trackID }) {
+            subtitleTracks[index].cues.removeAll { $0.startTime >= time }
+        } else {
+            subtitleTracks.append(
+                SubtitleTrack(
+                    id: trackID,
+                    name: "Live • \(localeName(locale))",
+                    cues: [],
+                    isEnabled: subtitleTracks.filter(\.isEnabled).count < 2
+                )
+            )
+        }
+
+        progressiveTranscriptionTask = Task { [weak self, transcriptionEngine] in
+            do {
+                let stream = transcriptionEngine.progressiveTranscription(
+                    audioAt: videoURL,
+                    locale: locale,
+                    trackID: trackID,
+                    startingAt: time
+                )
+                for try await cue in stream {
+                    try Task.checkCancellation()
+                    guard let self, progressiveTranscriptionID == operationID,
+                          let index = subtitleTracks.firstIndex(where: { $0.id == trackID }) else {
+                        return
+                    }
+                    subtitleTracks[index].cues.append(cue)
+                }
+                guard let self, progressiveTranscriptionID == operationID else { return }
+                progressiveTranscriptionTask = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self, progressiveTranscriptionID == operationID else { return }
+                progressiveTranscriptionTask = nil
+                progressiveTranscriptionID = nil
+                isProgressiveTranscriptionEnabled = false
+                progressiveTranscriptionError = error.localizedDescription
+            }
+        }
     }
 
     private func finishTranscription(_ operationID: UUID, with status: TranscriptionStatus) {

@@ -74,6 +74,56 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertEqual(restoredViewModel.subtitleStyles[1], style)
     }
+
+    func testProgressiveTranscriptionAddsCuesAsTheyArrive() async {
+        let viewModel = PlayerViewModel(
+            playbackEngine: PlaybackEngineSpy(),
+            transcriptionEngine: TranscriptionEngineStub()
+        )
+        viewModel.open(URL(fileURLWithPath: "/tmp/example.mp4"))
+        await viewModel.loadSupportedTranscriptionLocales()
+
+        viewModel.setProgressiveTranscriptionEnabled(true)
+        for _ in 0..<20 where viewModel.subtitleTracks.first?.cues.isEmpty != false {
+            await Task.yield()
+        }
+
+        XCTAssertTrue(viewModel.isProgressiveTranscriptionEnabled)
+        XCTAssertEqual(viewModel.subtitleTracks.first?.cues.first?.text, "Live cue")
+
+        viewModel.setProgressiveTranscriptionEnabled(false)
+        XCTAssertFalse(viewModel.isProgressiveTranscriptionEnabled)
+        XCTAssertTrue(viewModel.subtitleTracks.isEmpty)
+    }
+}
+
+private struct TranscriptionEngineStub: TranscriptionEngine {
+    func supportedLocales() async -> [Locale] {
+        [Locale(identifier: "en-US")]
+    }
+
+    func transcribe(audioAt url: URL, locale: Locale, trackID: UUID) async throws -> [SubtitleCue] {
+        []
+    }
+
+    func progressiveTranscription(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        startingAt time: TimeInterval
+    ) -> AsyncThrowingStream<SubtitleCue, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(
+                SubtitleCue(
+                    startTime: time,
+                    endTime: time + 1,
+                    text: "Live cue",
+                    trackID: trackID
+                )
+            )
+            continuation.finish()
+        }
+    }
 }
 
 @MainActor

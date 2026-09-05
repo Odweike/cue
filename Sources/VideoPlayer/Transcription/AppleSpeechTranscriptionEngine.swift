@@ -35,7 +35,7 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         guard !speechLocales.isEmpty || !dictationLocales.isEmpty else {
             throw SpeechTranscriptionError.unavailable
         }
-        if let supportedLocale = matchingLocale(locale, in: speechLocales) {
+        if let supportedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
             return try await transcribeSpeech(
                 audioAt: url,
                 locale: supportedLocale,
@@ -43,7 +43,7 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
             )
         }
 
-        if let supportedLocale = matchingLocale(locale, in: dictationLocales) {
+        if let supportedLocale = await DictationTranscriber.supportedLocale(equivalentTo: locale) {
             return try await transcribeDictation(
                 audioAt: url,
                 locale: supportedLocale,
@@ -52,6 +52,53 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         }
 
         throw SpeechTranscriptionError.unsupportedLocale
+    }
+
+    func progressiveTranscription(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        startingAt time: TimeInterval
+    ) -> AsyncThrowingStream<SubtitleCue, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let speechLocales = await SpeechTranscriber.supportedLocales
+                    let dictationLocales = await DictationTranscriber.supportedLocales
+                    guard !speechLocales.isEmpty || !dictationLocales.isEmpty else {
+                        throw SpeechTranscriptionError.unavailable
+                    }
+
+                    if let supportedLocale = await SpeechTranscriber.supportedLocale(
+                        equivalentTo: locale
+                    ) {
+                        try await streamSpeech(
+                            audioAt: url,
+                            locale: supportedLocale,
+                            trackID: trackID,
+                            startingAt: time,
+                            continuation: continuation
+                        )
+                    } else if let supportedLocale = await DictationTranscriber.supportedLocale(
+                        equivalentTo: locale
+                    ) {
+                        try await streamDictation(
+                            audioAt: url,
+                            locale: supportedLocale,
+                            trackID: trackID,
+                            startingAt: time,
+                            continuation: continuation
+                        )
+                    } else {
+                        throw SpeechTranscriptionError.unsupportedLocale
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     private func transcribeSpeech(
@@ -91,17 +138,6 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         return result
     }
 
-    private func matchingLocale(_ locale: Locale, in supportedLocales: [Locale]) -> Locale? {
-        supportedLocales.first { $0.identifier == locale.identifier }
-            ?? supportedLocales.first {
-                $0.language.languageCode == locale.language.languageCode
-                    && $0.region == locale.region
-            }
-            ?? supportedLocales.first {
-                $0.language.languageCode == locale.language.languageCode
-            }
-    }
-
     private func installAssetsIfNeeded(for module: any SpeechModule) async throws {
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
             try await installation.downloadAndInstall()
@@ -115,6 +151,57 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         } else {
             await analyzer.cancelAndFinishNow()
         }
+    }
+
+    private func streamSpeech(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        startingAt time: TimeInterval,
+        continuation: AsyncThrowingStream<SubtitleCue, Error>.Continuation
+    ) async throws {
+        let transcriber = SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
+        let audioFile = try audioFile(at: url, startingAt: time)
+        try await installAssetsIfNeeded(for: transcriber)
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        async let analysis: Void = analyze(audioFile, with: analyzer)
+
+        for try await result in transcriber.results where result.isFinal {
+            try Task.checkCancellation()
+            if let cue = cue(text: result.text, range: result.range, trackID: trackID, offset: time) {
+                continuation.yield(cue)
+            }
+        }
+        try await analysis
+    }
+
+    private func streamDictation(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        startingAt time: TimeInterval,
+        continuation: AsyncThrowingStream<SubtitleCue, Error>.Continuation
+    ) async throws {
+        let transcriber = DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
+        let audioFile = try audioFile(at: url, startingAt: time)
+        try await installAssetsIfNeeded(for: transcriber)
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        async let analysis: Void = analyze(audioFile, with: analyzer)
+
+        for try await result in transcriber.results where result.isFinal {
+            try Task.checkCancellation()
+            if let cue = cue(text: result.text, range: result.range, trackID: trackID, offset: time) {
+                continuation.yield(cue)
+            }
+        }
+        try await analysis
+    }
+
+    private func audioFile(at url: URL, startingAt time: TimeInterval) throws -> AVAudioFile {
+        let audioFile = try AVAudioFile(forReading: url)
+        let requestedFrame = AVAudioFramePosition(max(time, 0) * audioFile.fileFormat.sampleRate)
+        audioFile.framePosition = min(requestedFrame, audioFile.length)
+        return audioFile
     }
 
     private func collectSpeechResults(
@@ -152,7 +239,8 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
     private func cue(
         text attributedText: AttributedString,
         range: CMTimeRange,
-        trackID: UUID
+        trackID: UUID,
+        offset: TimeInterval = 0
     ) -> SubtitleCue? {
         let text = String(attributedText.characters)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -160,8 +248,8 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         let duration = CMTimeGetSeconds(range.duration)
         guard !text.isEmpty, start.isFinite, duration.isFinite, duration > 0 else { return nil }
         return SubtitleCue(
-            startTime: start,
-            endTime: start + duration,
+            startTime: start + offset,
+            endTime: start + offset + duration,
             text: text,
             trackID: trackID
         )

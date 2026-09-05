@@ -12,6 +12,7 @@ Native macOS video player built with SwiftUI and AppKit.
 - Import and display up to two SRT, VTT, or ASS subtitle tracks at once.
 - Customize and persist independent subtitle styles for the first and second visible tracks.
 - Generate time-coded subtitles locally with Apple Speech and save them beside the video as SRT.
+- Recognize subtitles progressively while watching, including restart after seeking.
 
 ## Run
 
