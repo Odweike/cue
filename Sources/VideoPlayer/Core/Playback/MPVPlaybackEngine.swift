@@ -8,6 +8,12 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private let eventDrainer: MPVEventDrainer
     private var playbackRate: Float = 1
     private var videoScalingMode = VideoScalingMode.fit
+    private var aspectRatio = VideoRatio.automatic
+    private var cropRatio = VideoRatio.automatic
+    private var rotation = VideoRotation.degrees0
+    private var hardwareDecoding = true
+    private var deinterlacing = false
+    private var videoEqualizer = VideoEqualizer()
 
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
@@ -22,7 +28,13 @@ final class MPVPlaybackEngine: PlaybackEngine {
             volume: Float(doubleProperty("volume", fallback: 100) / 100),
             isMuted: boolProperty("mute"),
             playbackRate: playbackRate,
-            videoScalingMode: videoScalingMode
+            videoScalingMode: videoScalingMode,
+            aspectRatio: aspectRatio,
+            cropRatio: cropRatio,
+            rotation: rotation,
+            hardwareDecoding: hardwareDecoding,
+            deinterlacing: deinterlacing,
+            videoEqualizer: videoEqualizer
         )
     }
 
@@ -96,13 +108,47 @@ final class MPVPlaybackEngine: PlaybackEngine {
     }
 
     func setPlaybackRate(_ rate: Float) {
-        playbackRate = min(max(rate, 0.25), 2)
+        playbackRate = min(max(rate, 0.25), 16)
         setDouble("speed", to: Double(playbackRate))
     }
 
     func setVideoScalingMode(_ mode: VideoScalingMode) {
         videoScalingMode = mode
         setDouble("panscan", to: mode == .fit ? 0 : 1)
+    }
+
+    func setAspectRatio(_ ratio: VideoRatio) {
+        aspectRatio = ratio
+        setString("video-aspect-override", to: ratio.mpvValue)
+    }
+
+    func setCropRatio(_ ratio: VideoRatio) {
+        cropRatio = ratio
+        setString("video-crop", to: ratio == .automatic ? "" : ratio.rawValue)
+    }
+
+    func setRotation(_ rotation: VideoRotation) {
+        self.rotation = rotation
+        setDouble("video-rotate", to: Double(rotation.rawValue))
+    }
+
+    func setHardwareDecoding(_ isEnabled: Bool) {
+        hardwareDecoding = isEnabled
+        setString("hwdec", to: isEnabled ? "videotoolbox-copy" : "no")
+    }
+
+    func setDeinterlacing(_ isEnabled: Bool) {
+        deinterlacing = isEnabled
+        setFlag("deinterlace", to: isEnabled)
+    }
+
+    func setVideoEqualizer(_ equalizer: VideoEqualizer) {
+        videoEqualizer = equalizer
+        setDouble("brightness", to: equalizer.brightness)
+        setDouble("contrast", to: equalizer.contrast)
+        setDouble("saturation", to: equalizer.saturation)
+        setDouble("gamma", to: equalizer.gamma)
+        setDouble("hue", to: equalizer.hue)
     }
 
     private func command(_ values: String...) {
@@ -127,6 +173,10 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private func setDouble(_ name: String, to value: Double) {
         var value = value
         mpv_set_property(context, name, MPV_FORMAT_DOUBLE, &value)
+    }
+
+    private func setString(_ name: String, to value: String) {
+        mpv_set_property_string(context, name, value)
     }
 
     private func boolProperty(_ name: String, fallback: Bool = false) -> Bool {

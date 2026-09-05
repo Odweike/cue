@@ -25,7 +25,7 @@ struct PlaybackSettingsPanel: View {
             }
         }
         .padding(16)
-        .frame(width: 400, height: 460)
+        .frame(width: 430, height: 580)
     }
 
     private var videoSettings: some View {
@@ -36,15 +36,46 @@ struct PlaybackSettingsPanel: View {
                     Text("Fill").tag(VideoScalingMode.fill)
                 }
                 .pickerStyle(.segmented)
+
+                Picker("Aspect Ratio", selection: aspectRatio) {
+                    ratioOptions(automaticTitle: "Original")
+                }
+
+                Picker("Crop", selection: cropRatio) {
+                    ratioOptions(automaticTitle: "None")
+                }
+
+                Picker("Rotation", selection: rotation) {
+                    ForEach(VideoRotation.allCases) { rotation in
+                        Text("\(rotation.rawValue)°").tag(rotation)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
 
-            Section("Playback speed") {
+            Section("Playback") {
                 HStack {
-                    Slider(value: playbackRate, in: 0.25...2, step: 0.25)
+                    Text("Speed")
+                    Slider(value: playbackRate, in: 0.25...16, step: 0.25)
                     Text(String(format: "%.2f×", viewModel.playbackState.playbackRate))
                         .monospacedDigit()
                         .fixedSize()
                         .frame(width: 58, alignment: .trailing)
+                }
+
+                Toggle("Hardware Decoding", isOn: hardwareDecoding)
+                Toggle("Deinterlace", isOn: deinterlacing)
+            }
+
+            Section("Color") {
+                AdjustmentRow("Brightness", value: equalizer(\.brightness))
+                AdjustmentRow("Contrast", value: equalizer(\.contrast))
+                AdjustmentRow("Saturation", value: equalizer(\.saturation))
+                AdjustmentRow("Gamma", value: equalizer(\.gamma))
+                AdjustmentRow("Hue", value: equalizer(\.hue))
+
+                Button("Reset Color Adjustments") {
+                    viewModel.setVideoEqualizer(VideoEqualizer())
                 }
             }
         }
@@ -81,6 +112,60 @@ struct PlaybackSettingsPanel: View {
         )
     }
 
+    private var aspectRatio: Binding<VideoRatio> {
+        Binding(
+            get: { viewModel.playbackState.aspectRatio },
+            set: { viewModel.setAspectRatio($0) }
+        )
+    }
+
+    private var cropRatio: Binding<VideoRatio> {
+        Binding(
+            get: { viewModel.playbackState.cropRatio },
+            set: { viewModel.setCropRatio($0) }
+        )
+    }
+
+    private var rotation: Binding<VideoRotation> {
+        Binding(
+            get: { viewModel.playbackState.rotation },
+            set: { viewModel.setRotation($0) }
+        )
+    }
+
+    private var hardwareDecoding: Binding<Bool> {
+        Binding(
+            get: { viewModel.playbackState.hardwareDecoding },
+            set: { viewModel.setHardwareDecoding($0) }
+        )
+    }
+
+    private var deinterlacing: Binding<Bool> {
+        Binding(
+            get: { viewModel.playbackState.deinterlacing },
+            set: { viewModel.setDeinterlacing($0) }
+        )
+    }
+
+    private func equalizer(_ keyPath: WritableKeyPath<VideoEqualizer, Double>) -> Binding<Double> {
+        Binding(
+            get: { viewModel.playbackState.videoEqualizer[keyPath: keyPath] },
+            set: { value in
+                var equalizer = viewModel.playbackState.videoEqualizer
+                equalizer[keyPath: keyPath] = value
+                viewModel.setVideoEqualizer(equalizer)
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func ratioOptions(automaticTitle: String) -> some View {
+        Text(automaticTitle).tag(VideoRatio.automatic)
+        ForEach(VideoRatio.allCases.filter { $0 != .automatic }) { ratio in
+            Text(ratio.rawValue).tag(ratio)
+        }
+    }
+
     private var muted: Binding<Bool> {
         Binding(
             get: { viewModel.playbackState.isMuted },
@@ -93,6 +178,27 @@ struct PlaybackSettingsPanel: View {
             get: { Double(viewModel.playbackState.volume) },
             set: { viewModel.setVolume(Float($0)) }
         )
+    }
+}
+
+private struct AdjustmentRow: View {
+    let title: String
+    @Binding var value: Double
+
+    init(_ title: String, value: Binding<Double>) {
+        self.title = title
+        _value = value
+    }
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .frame(width: 76, alignment: .leading)
+            Slider(value: $value, in: -100...100, step: 1)
+            Text("\(Int(value))")
+                .monospacedDigit()
+                .frame(width: 34, alignment: .trailing)
+        }
     }
 }
 

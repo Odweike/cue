@@ -7,6 +7,12 @@ final class AVPlaybackEngine: PlaybackEngine {
     private let playerView = AVPlayerView()
     private var playbackRate: Float = 1
     private var videoScalingMode = VideoScalingMode.fit
+    private var aspectRatio = VideoRatio.automatic
+    private var cropRatio = VideoRatio.automatic
+    private var rotation = VideoRotation.degrees0
+    private var hardwareDecoding = true
+    private var deinterlacing = false
+    private var videoEqualizer = VideoEqualizer()
 
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
@@ -18,7 +24,13 @@ final class AVPlaybackEngine: PlaybackEngine {
             volume: player.volume,
             isMuted: player.isMuted,
             playbackRate: playbackRate,
-            videoScalingMode: videoScalingMode
+            videoScalingMode: videoScalingMode,
+            aspectRatio: aspectRatio,
+            cropRatio: cropRatio,
+            rotation: rotation,
+            hardwareDecoding: hardwareDecoding,
+            deinterlacing: deinterlacing,
+            videoEqualizer: videoEqualizer
         )
     }
 
@@ -60,7 +72,7 @@ final class AVPlaybackEngine: PlaybackEngine {
     }
 
     func setPlaybackRate(_ rate: Float) {
-        playbackRate = min(max(rate, 0.25), 2)
+        playbackRate = min(max(rate, 0.25), 16)
         if player.rate != 0 {
             player.rate = playbackRate
         }
@@ -69,6 +81,30 @@ final class AVPlaybackEngine: PlaybackEngine {
     func setVideoScalingMode(_ mode: VideoScalingMode) {
         videoScalingMode = mode
         playerView.videoGravity = mode == .fit ? .resizeAspect : .resizeAspectFill
+    }
+
+    func setAspectRatio(_ ratio: VideoRatio) {
+        aspectRatio = ratio
+    }
+
+    func setCropRatio(_ ratio: VideoRatio) {
+        cropRatio = ratio
+    }
+
+    func setRotation(_ rotation: VideoRotation) {
+        self.rotation = rotation
+    }
+
+    func setHardwareDecoding(_ isEnabled: Bool) {
+        hardwareDecoding = isEnabled
+    }
+
+    func setDeinterlacing(_ isEnabled: Bool) {
+        deinterlacing = isEnabled
+    }
+
+    func setVideoEqualizer(_ equalizer: VideoEqualizer) {
+        videoEqualizer = equalizer
     }
 
     private func finiteSeconds(_ value: Double?) -> TimeInterval {

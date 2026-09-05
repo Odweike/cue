@@ -30,6 +30,12 @@ final class PlayerViewModelTests: XCTestCase {
         viewModel.setMuted(true)
         viewModel.setPlaybackRate(1.5)
         viewModel.setVideoScalingMode(.fill)
+        viewModel.setAspectRatio(.ratio16x9)
+        viewModel.setCropRatio(.ratio4x3)
+        viewModel.setRotation(.degrees90)
+        viewModel.setHardwareDecoding(false)
+        viewModel.setDeinterlacing(true)
+        viewModel.setVideoEqualizer(VideoEqualizer(brightness: 10, contrast: -5))
         viewModel.seek(to: 42)
         viewModel.skip(by: 10)
 
@@ -37,6 +43,12 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.isMuted, true)
         XCTAssertEqual(engine.playbackRate, 1.5)
         XCTAssertEqual(engine.videoScalingMode, .fill)
+        XCTAssertEqual(engine.aspectRatio, .ratio16x9)
+        XCTAssertEqual(engine.cropRatio, .ratio4x3)
+        XCTAssertEqual(engine.rotation, .degrees90)
+        XCTAssertEqual(engine.hardwareDecoding, false)
+        XCTAssertEqual(engine.deinterlacing, true)
+        XCTAssertEqual(engine.videoEqualizer, VideoEqualizer(brightness: 10, contrast: -5))
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.skipInterval, 10)
     }
@@ -142,6 +154,12 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     private(set) var isMuted: Bool?
     private(set) var playbackRate: Float?
     private(set) var videoScalingMode: VideoScalingMode?
+    private(set) var aspectRatio: VideoRatio?
+    private(set) var cropRatio: VideoRatio?
+    private(set) var rotation: VideoRotation?
+    private(set) var hardwareDecoding: Bool?
+    private(set) var deinterlacing: Bool?
+    private(set) var videoEqualizer: VideoEqualizer?
     private(set) var seekTime: TimeInterval?
     private(set) var skipInterval: TimeInterval?
 
@@ -176,5 +194,29 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func setVideoScalingMode(_ mode: VideoScalingMode) {
         videoScalingMode = mode
+    }
+
+    func setAspectRatio(_ ratio: VideoRatio) {
+        aspectRatio = ratio
+    }
+
+    func setCropRatio(_ ratio: VideoRatio) {
+        cropRatio = ratio
+    }
+
+    func setRotation(_ rotation: VideoRotation) {
+        self.rotation = rotation
+    }
+
+    func setHardwareDecoding(_ isEnabled: Bool) {
+        hardwareDecoding = isEnabled
+    }
+
+    func setDeinterlacing(_ isEnabled: Bool) {
+        deinterlacing = isEnabled
+    }
+
+    func setVideoEqualizer(_ equalizer: VideoEqualizer) {
+        videoEqualizer = equalizer
     }
 }

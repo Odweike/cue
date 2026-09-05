@@ -9,6 +9,7 @@ Native macOS video player built with SwiftUI and AppKit.
 - The in-player floating panel can be moved and resized from its corner, and remembers its layout.
 - Play MKV, MP4, MOV, and other common formats through the embedded LGPL build of libmpv.
 - Playback stays isolated behind `PlaybackEngine`, with the native AVFoundation engine retained as a fallback implementation.
+- Adjust scaling, aspect ratio, crop, rotation, playback speed, hardware decoding, deinterlacing, and picture color controls.
 - Import and display up to two SRT, VTT, or ASS subtitle tracks at once.
 - Export any imported or generated subtitle track as SRT.
 - Customize and persist independent subtitle styles for the first and second visible tracks.

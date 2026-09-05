@@ -96,6 +96,36 @@ final class PlayerViewModel {
         refreshPlaybackState()
     }
 
+    func setAspectRatio(_ ratio: VideoRatio) {
+        playbackEngine.setAspectRatio(ratio)
+        refreshPlaybackState()
+    }
+
+    func setCropRatio(_ ratio: VideoRatio) {
+        playbackEngine.setCropRatio(ratio)
+        refreshPlaybackState()
+    }
+
+    func setRotation(_ rotation: VideoRotation) {
+        playbackEngine.setRotation(rotation)
+        refreshPlaybackState()
+    }
+
+    func setHardwareDecoding(_ isEnabled: Bool) {
+        playbackEngine.setHardwareDecoding(isEnabled)
+        refreshPlaybackState()
+    }
+
+    func setDeinterlacing(_ isEnabled: Bool) {
+        playbackEngine.setDeinterlacing(isEnabled)
+        refreshPlaybackState()
+    }
+
+    func setVideoEqualizer(_ equalizer: VideoEqualizer) {
+        playbackEngine.setVideoEqualizer(equalizer)
+        refreshPlaybackState()
+    }
+
     var visibleSubtitleCues: [SubtitleCue] {
         let time = playbackState.currentTime
         return subtitleTracks
