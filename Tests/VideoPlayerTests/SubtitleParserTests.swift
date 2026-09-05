@@ -33,4 +33,21 @@ final class SubtitleParserTests: XCTestCase {
         XCTAssertEqual(assCue.endTime, 9.25)
         XCTAssertEqual(assCue.text, "Third\nline")
     }
+
+    func testWritesSRTWithMillisecondTimestamps() {
+        let trackID = UUID()
+        let contents = SubtitleFileWriter.srtContents(for: [
+            SubtitleCue(
+                startTime: 1.25,
+                endTime: 3.875,
+                text: "Hello\nworld",
+                trackID: trackID
+            )
+        ])
+
+        XCTAssertEqual(
+            contents,
+            "1\n00:00:01,250 --> 00:00:03,875\nHello\nworld\n"
+        )
+    }
 }

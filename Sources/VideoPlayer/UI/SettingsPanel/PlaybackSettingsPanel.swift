@@ -25,7 +25,7 @@ struct PlaybackSettingsPanel: View {
             }
         }
         .padding(16)
-        .frame(width: 380, height: 330)
+        .frame(width: 400, height: 460)
     }
 
     private var videoSettings: some View {

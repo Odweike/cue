@@ -10,7 +10,7 @@ Native macOS video player built with SwiftUI and AppKit.
 - Playback is isolated behind `PlaybackEngine` so AVFoundation can be replaced by libmpv.
 - Import and display up to two SRT, VTT, or ASS subtitle tracks at once.
 - Customize and persist independent subtitle styles for the first and second visible tracks.
-- Transcription domain boundaries are present, but recognition is not implemented yet.
+- Generate time-coded subtitles locally with Apple Speech and save them beside the video as SRT.
 
 ## Run
 

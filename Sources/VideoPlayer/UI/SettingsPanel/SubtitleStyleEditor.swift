@@ -6,6 +6,46 @@ struct SubtitleStyleEditor: View {
 
     var body: some View {
         Form {
+            Section("Generate Subtitles") {
+                if viewModel.supportedTranscriptionLocales.isEmpty {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Checking available languages…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Picker("Language", selection: transcriptionLocale) {
+                        ForEach(viewModel.supportedTranscriptionLocales, id: \.identifier) { locale in
+                            Text(viewModel.localeName(locale))
+                                .tag(locale.identifier)
+                        }
+                    }
+                }
+
+                HStack {
+                    if viewModel.transcriptionStatus.isRunning {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Recognizing speech on this Mac…")
+                        Spacer()
+                        Button("Cancel") {
+                            viewModel.cancelTranscription()
+                        }
+                    } else {
+                        Button("Generate from Audio", systemImage: "waveform.badge.mic") {
+                            viewModel.startTranscription()
+                        }
+                        .disabled(
+                            viewModel.currentURL == nil
+                                || viewModel.supportedTranscriptionLocales.isEmpty
+                        )
+                    }
+                }
+
+                transcriptionResult
+            }
+
             Picker("Track style", selection: $selectedTrack) {
                 Text("First").tag(0)
                 Text("Second").tag(1)
@@ -50,6 +90,32 @@ struct SubtitleStyleEditor: View {
             }
         }
         .formStyle(.grouped)
+        .task {
+            await viewModel.loadSupportedTranscriptionLocales()
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptionResult: some View {
+        switch viewModel.transcriptionStatus {
+        case .completed(let url):
+            Label("Saved as \(url.lastPathComponent)", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.caption)
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .font(.caption)
+        case .idle, .running:
+            EmptyView()
+        }
+    }
+
+    private var transcriptionLocale: Binding<String> {
+        Binding(
+            get: { viewModel.selectedTranscriptionLocaleIdentifier },
+            set: { viewModel.selectTranscriptionLocale($0) }
+        )
     }
 
     private var style: Binding<SubtitleStyle> {

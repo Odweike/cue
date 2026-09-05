@@ -5,21 +5,37 @@ import Observation
 @Observable
 final class PlayerViewModel {
     private static let subtitleStylesKey = "SubtitleStyles"
+    private static let transcriptionLocaleKey = "TranscriptionLocale"
 
     let playbackEngine: any PlaybackEngine
+    private let transcriptionEngine: any TranscriptionEngine
     private let userDefaults: UserDefaults
+    private var transcriptionTask: Task<Void, Never>?
+    private var transcriptionID: UUID?
     private(set) var currentURL: URL?
     private(set) var playbackState = PlaybackState()
     private(set) var subtitleTracks: [SubtitleTrack] = []
     private(set) var subtitleStyles: [SubtitleStyle]
+    private(set) var supportedTranscriptionLocales: [Locale] = []
+    private(set) var transcriptionStatus = TranscriptionStatus.idle
+    private(set) var selectedTranscriptionLocaleIdentifier: String
 
-    init(playbackEngine: any PlaybackEngine, userDefaults: UserDefaults = .standard) {
+    init(
+        playbackEngine: any PlaybackEngine,
+        transcriptionEngine: any TranscriptionEngine = AppleSpeechTranscriptionEngine(),
+        userDefaults: UserDefaults = .standard
+    ) {
         self.playbackEngine = playbackEngine
+        self.transcriptionEngine = transcriptionEngine
         self.userDefaults = userDefaults
         subtitleStyles = Self.loadSubtitleStyles(from: userDefaults)
+        selectedTranscriptionLocaleIdentifier = userDefaults.string(
+            forKey: Self.transcriptionLocaleKey
+        ) ?? Locale.current.identifier
     }
 
     func open(_ url: URL) {
+        cancelTranscription()
         subtitleTracks.removeAll()
         playbackEngine.open(url)
         currentURL = url
@@ -111,6 +127,85 @@ final class PlayerViewModel {
         let defaults: [SubtitleStyle] = [.primary, .secondary]
         guard defaults.indices.contains(index) else { return }
         setSubtitleStyle(defaults[index], at: index)
+    }
+
+    func loadSupportedTranscriptionLocales() async {
+        guard supportedTranscriptionLocales.isEmpty else { return }
+        let locales = await transcriptionEngine.supportedLocales()
+        supportedTranscriptionLocales = locales.sorted {
+            localeName($0) < localeName($1)
+        }
+
+        let selected = Locale(identifier: selectedTranscriptionLocaleIdentifier)
+        if let equivalent = locales.first(where: {
+            $0.language.languageCode == selected.language.languageCode
+        }) ?? locales.first {
+            selectTranscriptionLocale(equivalent.identifier)
+        }
+    }
+
+    func selectTranscriptionLocale(_ identifier: String) {
+        guard supportedTranscriptionLocales.contains(where: { $0.identifier == identifier }) else { return }
+        selectedTranscriptionLocaleIdentifier = identifier
+        userDefaults.set(identifier, forKey: Self.transcriptionLocaleKey)
+    }
+
+    func startTranscription() {
+        guard transcriptionTask == nil, let videoURL = currentURL else { return }
+        let locale = Locale(identifier: selectedTranscriptionLocaleIdentifier)
+        let trackID = UUID()
+        let operationID = UUID()
+        transcriptionID = operationID
+        transcriptionStatus = .running
+
+        transcriptionTask = Task { [weak self, transcriptionEngine] in
+            do {
+                let cues = try await transcriptionEngine.transcribe(
+                    audioAt: videoURL,
+                    locale: locale,
+                    trackID: trackID
+                )
+                try Task.checkCancellation()
+                let outputURL = try SubtitleFileWriter.writeSRT(
+                    cues,
+                    beside: videoURL,
+                    locale: locale
+                )
+                guard let self, transcriptionID == operationID else { return }
+                let isEnabled = subtitleTracks.filter(\.isEnabled).count < 2
+                subtitleTracks.append(
+                    SubtitleTrack(
+                        id: trackID,
+                        name: "Generated • \(localeName(locale))",
+                        cues: cues,
+                        isEnabled: isEnabled
+                    )
+                )
+                finishTranscription(operationID, with: .completed(outputURL))
+            } catch is CancellationError {
+                self?.finishTranscription(operationID, with: .idle)
+            } catch {
+                self?.finishTranscription(operationID, with: .failed(error.localizedDescription))
+            }
+        }
+    }
+
+    func cancelTranscription() {
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        transcriptionID = nil
+        transcriptionStatus = .idle
+    }
+
+    private func finishTranscription(_ operationID: UUID, with status: TranscriptionStatus) {
+        guard transcriptionID == operationID else { return }
+        transcriptionTask = nil
+        transcriptionID = nil
+        transcriptionStatus = status
+    }
+
+    func localeName(_ locale: Locale) -> String {
+        Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
     }
 
     private static func loadSubtitleStyles(from userDefaults: UserDefaults) -> [SubtitleStyle] {

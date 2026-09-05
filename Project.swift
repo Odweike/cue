@@ -31,6 +31,7 @@ let project = Project(
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "Cue",
                 "CFBundleName": "Cue",
+                "NSSpeechRecognitionUsageDescription": "Cue uses on-device speech recognition to generate subtitles for videos you choose.",
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
                 "CFBundleDocumentTypes": .array([
