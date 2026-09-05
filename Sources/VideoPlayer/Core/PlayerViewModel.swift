@@ -18,6 +18,7 @@ final class PlayerViewModel {
     private(set) var currentURL: URL?
     private(set) var playbackState = PlaybackState()
     private(set) var subtitleTracks: [SubtitleTrack] = []
+    private(set) var audioTracks: [AudioTrack] = []
     private(set) var subtitleStyles: [SubtitleStyle]
     private(set) var supportedTranscriptionLocales: [Locale] = []
     private(set) var transcriptionStatus = TranscriptionStatus.idle
@@ -43,6 +44,7 @@ final class PlayerViewModel {
         cancelTranscription()
         setProgressiveTranscriptionEnabled(false)
         subtitleTracks.removeAll()
+        audioTracks.removeAll()
         playbackEngine.open(url)
         currentURL = url
         refreshPlaybackState()
@@ -123,6 +125,20 @@ final class PlayerViewModel {
 
     func setVideoEqualizer(_ equalizer: VideoEqualizer) {
         playbackEngine.setVideoEqualizer(equalizer)
+        refreshPlaybackState()
+    }
+
+    func refreshAudioTracks() {
+        audioTracks = playbackEngine.audioTracks()
+    }
+
+    func selectAudioTrack(_ id: Int64) {
+        playbackEngine.selectAudioTrack(id)
+        refreshAudioTracks()
+    }
+
+    func setAudioDelay(_ delay: TimeInterval) {
+        playbackEngine.setAudioDelay(delay)
         refreshPlaybackState()
     }
 

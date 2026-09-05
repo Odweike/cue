@@ -51,6 +51,7 @@ struct PlaybackState: Equatable, Sendable {
     var hardwareDecoding = true
     var deinterlacing = false
     var videoEqualizer = VideoEqualizer()
+    var audioDelay: TimeInterval = 0
 }
 
 @MainActor
@@ -74,4 +75,7 @@ protocol PlaybackEngine: AnyObject {
     func setHardwareDecoding(_ isEnabled: Bool)
     func setDeinterlacing(_ isEnabled: Bool)
     func setVideoEqualizer(_ equalizer: VideoEqualizer)
+    func audioTracks() -> [AudioTrack]
+    func selectAudioTrack(_ id: Int64)
+    func setAudioDelay(_ delay: TimeInterval)
 }

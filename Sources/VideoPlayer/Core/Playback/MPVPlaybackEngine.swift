@@ -14,6 +14,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private var hardwareDecoding = true
     private var deinterlacing = false
     private var videoEqualizer = VideoEqualizer()
+    private var audioDelay: TimeInterval = 0
 
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
@@ -34,7 +35,8 @@ final class MPVPlaybackEngine: PlaybackEngine {
             rotation: rotation,
             hardwareDecoding: hardwareDecoding,
             deinterlacing: deinterlacing,
-            videoEqualizer: videoEqualizer
+            videoEqualizer: videoEqualizer,
+            audioDelay: audioDelay
         )
     }
 
@@ -151,6 +153,31 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setDouble("hue", to: equalizer.hue)
     }
 
+    func audioTracks() -> [AudioTrack] {
+        let count = max(int64Property("track-list/count"), 0)
+        return (0..<count).compactMap { index in
+            let prefix = "track-list/\(index)"
+            guard stringProperty("\(prefix)/type") == "audio" else { return nil }
+            return AudioTrack(
+                id: int64Property("\(prefix)/id"),
+                title: stringProperty("\(prefix)/title"),
+                language: stringProperty("\(prefix)/lang"),
+                codec: stringProperty("\(prefix)/codec"),
+                channelCount: Int(int64Property("\(prefix)/demux-channel-count")),
+                isSelected: boolProperty("\(prefix)/selected")
+            )
+        }
+    }
+
+    func selectAudioTrack(_ id: Int64) {
+        setInt64("aid", to: id)
+    }
+
+    func setAudioDelay(_ delay: TimeInterval) {
+        audioDelay = min(max(delay, -5), 5)
+        setDouble("audio-delay", to: audioDelay)
+    }
+
     private func command(_ values: String...) {
         var arguments = values.map { UnsafePointer<CChar>(strdup($0)) }
         arguments.append(nil)
@@ -179,6 +206,11 @@ final class MPVPlaybackEngine: PlaybackEngine {
         mpv_set_property_string(context, name, value)
     }
 
+    private func setInt64(_ name: String, to value: Int64) {
+        var value = value
+        mpv_set_property(context, name, MPV_FORMAT_INT64, &value)
+    }
+
     private func boolProperty(_ name: String, fallback: Bool = false) -> Bool {
         var value: Int32 = fallback ? 1 : 0
         guard mpv_get_property(context, name, MPV_FORMAT_FLAG, &value) >= 0 else { return fallback }
@@ -189,6 +221,18 @@ final class MPVPlaybackEngine: PlaybackEngine {
         var value = fallback
         guard mpv_get_property(context, name, MPV_FORMAT_DOUBLE, &value) >= 0 else { return fallback }
         return value
+    }
+
+    private func int64Property(_ name: String, fallback: Int64 = 0) -> Int64 {
+        var value = fallback
+        guard mpv_get_property(context, name, MPV_FORMAT_INT64, &value) >= 0 else { return fallback }
+        return value
+    }
+
+    private func stringProperty(_ name: String) -> String? {
+        guard let value = mpv_get_property_string(context, name) else { return nil }
+        defer { mpv_free(value) }
+        return String(cString: value)
     }
 
     private func nonnegative(_ value: Double) -> TimeInterval {

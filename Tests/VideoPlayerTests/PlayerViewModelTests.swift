@@ -36,6 +36,7 @@ final class PlayerViewModelTests: XCTestCase {
         viewModel.setHardwareDecoding(false)
         viewModel.setDeinterlacing(true)
         viewModel.setVideoEqualizer(VideoEqualizer(brightness: 10, contrast: -5))
+        viewModel.setAudioDelay(0.4)
         viewModel.seek(to: 42)
         viewModel.skip(by: 10)
 
@@ -49,6 +50,7 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.hardwareDecoding, false)
         XCTAssertEqual(engine.deinterlacing, true)
         XCTAssertEqual(engine.videoEqualizer, VideoEqualizer(brightness: 10, contrast: -5))
+        XCTAssertEqual(engine.audioDelay, 0.4)
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.skipInterval, 10)
     }
@@ -68,6 +70,27 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertFalse(viewModel.playbackState.isMuted)
         XCTAssertEqual(viewModel.playbackState.volume, 0.4)
+    }
+
+    func testAudioTracksCanBeLoadedAndSelected() {
+        let engine = PlaybackEngineSpy()
+        engine.availableAudioTracks = [
+            AudioTrack(
+                id: 2,
+                title: "Original",
+                language: "eng",
+                codec: "aac",
+                channelCount: 6,
+                isSelected: true
+            )
+        ]
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+
+        viewModel.refreshAudioTracks()
+        viewModel.selectAudioTrack(2)
+
+        XCTAssertEqual(viewModel.audioTracks.first?.displayName, "Original • ENG • AAC • 6 ch")
+        XCTAssertEqual(engine.selectedAudioTrackID, 2)
     }
 
     func testSubtitleStylesPersistBetweenViewModels() {
@@ -160,6 +183,9 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     private(set) var hardwareDecoding: Bool?
     private(set) var deinterlacing: Bool?
     private(set) var videoEqualizer: VideoEqualizer?
+    var availableAudioTracks: [AudioTrack] = []
+    private(set) var selectedAudioTrackID: Int64?
+    private(set) var audioDelay: TimeInterval?
     private(set) var seekTime: TimeInterval?
     private(set) var skipInterval: TimeInterval?
 
@@ -218,5 +244,17 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func setVideoEqualizer(_ equalizer: VideoEqualizer) {
         videoEqualizer = equalizer
+    }
+
+    func audioTracks() -> [AudioTrack] {
+        availableAudioTracks
+    }
+
+    func selectAudioTrack(_ id: Int64) {
+        selectedAudioTrackID = id
+    }
+
+    func setAudioDelay(_ delay: TimeInterval) {
+        audioDelay = delay
     }
 }

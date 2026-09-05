@@ -13,6 +13,7 @@ final class AVPlaybackEngine: PlaybackEngine {
     private var hardwareDecoding = true
     private var deinterlacing = false
     private var videoEqualizer = VideoEqualizer()
+    private var audioDelay: TimeInterval = 0
 
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
@@ -30,7 +31,8 @@ final class AVPlaybackEngine: PlaybackEngine {
             rotation: rotation,
             hardwareDecoding: hardwareDecoding,
             deinterlacing: deinterlacing,
-            videoEqualizer: videoEqualizer
+            videoEqualizer: videoEqualizer,
+            audioDelay: audioDelay
         )
     }
 
@@ -105,6 +107,16 @@ final class AVPlaybackEngine: PlaybackEngine {
 
     func setVideoEqualizer(_ equalizer: VideoEqualizer) {
         videoEqualizer = equalizer
+    }
+
+    func audioTracks() -> [AudioTrack] {
+        []
+    }
+
+    func selectAudioTrack(_ id: Int64) {}
+
+    func setAudioDelay(_ delay: TimeInterval) {
+        audioDelay = min(max(delay, -5), 5)
     }
 
     private func finiteSeconds(_ value: Double?) -> TimeInterval {

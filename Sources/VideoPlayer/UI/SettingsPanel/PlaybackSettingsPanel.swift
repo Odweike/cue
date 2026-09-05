@@ -84,18 +84,49 @@ struct PlaybackSettingsPanel: View {
 
     private var audioSettings: some View {
         Form {
-            Section("Audio") {
+            Section("Track") {
+                if viewModel.audioTracks.isEmpty {
+                    Text("No audio tracks available")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Audio Track", selection: selectedAudioTrack) {
+                        ForEach(viewModel.audioTracks) { track in
+                            Text(track.displayName).tag(track.id)
+                        }
+                    }
+                }
+            }
+
+            Section("Output") {
                 Toggle("Mute", isOn: muted)
 
                 HStack {
+                    Text("Volume")
                     Slider(value: volume, in: 0...1)
                     Text("\(Int(viewModel.playbackState.volume * 100))%")
                         .monospacedDigit()
                         .frame(width: 42, alignment: .trailing)
                 }
             }
+
+            Section("Synchronization") {
+                HStack {
+                    Text("Audio Delay")
+                    Slider(value: audioDelay, in: -5...5, step: 0.1)
+                    Text(String(format: "%+.1f s", viewModel.playbackState.audioDelay))
+                        .monospacedDigit()
+                        .frame(width: 54, alignment: .trailing)
+                }
+
+                Button("Reset Audio Delay") {
+                    viewModel.setAudioDelay(0)
+                }
+            }
         }
         .formStyle(.grouped)
+        .onAppear {
+            viewModel.refreshAudioTracks()
+        }
     }
 
     private var scalingMode: Binding<VideoScalingMode> {
@@ -177,6 +208,24 @@ struct PlaybackSettingsPanel: View {
         Binding(
             get: { Double(viewModel.playbackState.volume) },
             set: { viewModel.setVolume(Float($0)) }
+        )
+    }
+
+    private var selectedAudioTrack: Binding<Int64> {
+        Binding(
+            get: {
+                viewModel.audioTracks.first(where: \.isSelected)?.id
+                    ?? viewModel.audioTracks.first?.id
+                    ?? 0
+            },
+            set: { viewModel.selectAudioTrack($0) }
+        )
+    }
+
+    private var audioDelay: Binding<Double> {
+        Binding(
+            get: { viewModel.playbackState.audioDelay },
+            set: { viewModel.setAudioDelay($0) }
         )
     }
 }
