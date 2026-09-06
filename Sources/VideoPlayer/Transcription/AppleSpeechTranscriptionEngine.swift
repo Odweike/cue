@@ -21,6 +21,8 @@ enum SpeechTranscriptionError: LocalizedError {
 }
 
 struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
+    private let audioExtractor = AudioExtractor()
+
     func supportedLocales() async -> [Locale] {
         async let speechLocales = SpeechTranscriber.supportedLocales
         async let dictationLocales = DictationTranscriber.supportedLocales
@@ -106,11 +108,13 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         locale: Locale,
         trackID: UUID
     ) async throws -> [SubtitleCue] {
+        let extractedURL = try await audioExtractor.extract(from: url)
+        defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = SpeechTranscriber(
             locale: locale,
             preset: .timeIndexedTranscriptionWithAlternatives
         )
-        let audioFile = try AVAudioFile(forReading: url)
+        let audioFile = try AVAudioFile(forReading: extractedURL)
         try await installAssetsIfNeeded(for: transcriber)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let cues = collectSpeechResults(from: transcriber, trackID: trackID)
@@ -123,8 +127,10 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         locale: Locale,
         trackID: UUID
     ) async throws -> [SubtitleCue] {
+        let extractedURL = try await audioExtractor.extract(from: url)
+        defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
-        let audioFile = try AVAudioFile(forReading: url)
+        let audioFile = try AVAudioFile(forReading: extractedURL)
         try await installAssetsIfNeeded(for: transcriber)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let cues = collectDictationResults(from: transcriber, trackID: trackID)
@@ -160,8 +166,10 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         startingAt time: TimeInterval,
         continuation: AsyncThrowingStream<SubtitleCue, Error>.Continuation
     ) async throws {
+        let extractedURL = try await audioExtractor.extract(from: url, startingAt: time)
+        defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
-        let audioFile = try audioFile(at: url, startingAt: time)
+        let audioFile = try AVAudioFile(forReading: extractedURL)
         try await installAssetsIfNeeded(for: transcriber)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let analysis: Void = analyze(audioFile, with: analyzer)
@@ -182,8 +190,10 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         startingAt time: TimeInterval,
         continuation: AsyncThrowingStream<SubtitleCue, Error>.Continuation
     ) async throws {
+        let extractedURL = try await audioExtractor.extract(from: url, startingAt: time)
+        defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
-        let audioFile = try audioFile(at: url, startingAt: time)
+        let audioFile = try AVAudioFile(forReading: extractedURL)
         try await installAssetsIfNeeded(for: transcriber)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let analysis: Void = analyze(audioFile, with: analyzer)
@@ -195,13 +205,6 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
             }
         }
         try await analysis
-    }
-
-    private func audioFile(at url: URL, startingAt time: TimeInterval) throws -> AVAudioFile {
-        let audioFile = try AVAudioFile(forReading: url)
-        let requestedFrame = AVAudioFramePosition(max(time, 0) * audioFile.fileFormat.sampleRate)
-        audioFile.framePosition = min(requestedFrame, audioFile.length)
-        return audioFile
     }
 
     private func collectSpeechResults(

@@ -1,9 +1,25 @@
 import AppKit
+import AVFAudio
 import XCTest
 @testable import VideoPlayer
 
 @MainActor
 final class PlayerViewModelTests: XCTestCase {
+    func testAudioExtractorWithOptionalLocalVideo() async throws {
+        guard let path = ProcessInfo.processInfo.environment["CUE_TEST_VIDEO"] else {
+            throw XCTSkip("Set CUE_TEST_VIDEO to run the local media integration test")
+        }
+        let outputURL = try await AudioExtractor().extract(
+            from: URL(fileURLWithPath: path),
+            duration: 2
+        )
+        defer { try? FileManager.default.removeItem(at: outputURL) }
+
+        let audioFile = try AVAudioFile(forReading: outputURL)
+        XCTAssertGreaterThan(audioFile.length, 0)
+        XCTAssertEqual(audioFile.processingFormat.channelCount, 1)
+    }
+
     func testOpeningVideoUpdatesEngineAndViewModel() {
         let engine = PlaybackEngineSpy()
         let viewModel = PlayerViewModel(playbackEngine: engine)
