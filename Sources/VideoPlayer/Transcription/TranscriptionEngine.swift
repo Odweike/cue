@@ -11,13 +11,25 @@ enum TranscriptionStatus: Equatable {
     }
 }
 
+enum TranscriptionActivity: Equatable, Sendable {
+    case extractingAudio
+    case preparingLanguage(Double)
+    case recognizing
+}
+
 protocol TranscriptionEngine: Sendable {
     func supportedLocales() async -> [Locale]
-    func transcribe(audioAt url: URL, locale: Locale, trackID: UUID) async throws -> [SubtitleCue]
+    func transcribe(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
+    ) async throws -> [SubtitleCue]
     func progressiveTranscription(
         audioAt url: URL,
         locale: Locale,
         trackID: UUID,
-        startingAt time: TimeInterval
+        startingAt time: TimeInterval,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
     ) -> AsyncThrowingStream<SubtitleCue, Error>
 }

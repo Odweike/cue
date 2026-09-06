@@ -28,7 +28,7 @@ struct SubtitleStyleEditor: View {
                     if viewModel.transcriptionStatus.isRunning {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Recognizing speech on this Mac…")
+                        Text(activityDescription(viewModel.transcriptionActivity))
                         Spacer()
                         Button("Cancel") {
                             viewModel.cancelTranscription()
@@ -49,6 +49,13 @@ struct SubtitleStyleEditor: View {
                         viewModel.currentURL == nil
                             || viewModel.supportedTranscriptionLocales.isEmpty
                     )
+
+                if viewModel.isProgressiveTranscriptionEnabled,
+                   let activity = viewModel.progressiveTranscriptionActivity {
+                    Label(activityDescription(activity), systemImage: "waveform")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
 
                 if let message = viewModel.progressiveTranscriptionError {
                     Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -183,6 +190,15 @@ struct SubtitleStyleEditor: View {
         .task {
             await viewModel.loadSupportedTranscriptionLocales()
         }
+        .sheet(isPresented: languageAssetSheetPresented) {
+            LanguageAssetSheet(
+                languageName: viewModel.localeName(
+                    Locale(identifier: viewModel.selectedTranscriptionLocaleIdentifier)
+                ),
+                progress: viewModel.languageAssetDownloadProgress ?? 0,
+                cancel: viewModel.cancelLanguageAssetPreparation
+            )
+        }
     }
 
     @ViewBuilder
@@ -213,6 +229,26 @@ struct SubtitleStyleEditor: View {
             get: { viewModel.isProgressiveTranscriptionEnabled },
             set: { viewModel.setProgressiveTranscriptionEnabled($0) }
         )
+    }
+
+    private var languageAssetSheetPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.languageAssetDownloadProgress != nil },
+            set: { _ in }
+        )
+    }
+
+    private func activityDescription(_ activity: TranscriptionActivity?) -> String {
+        switch activity {
+        case .extractingAudio:
+            "Preparing audio…"
+        case .preparingLanguage:
+            "Preparing language package…"
+        case .recognizing:
+            "Recognizing speech on this Mac…"
+        case nil:
+            "Starting…"
+        }
     }
 
     private var style: Binding<SubtitleStyle> {

@@ -31,7 +31,12 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
             .compactMap(\.value.first)
     }
 
-    func transcribe(audioAt url: URL, locale: Locale, trackID: UUID) async throws -> [SubtitleCue] {
+    func transcribe(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
+    ) async throws -> [SubtitleCue] {
         let speechLocales = await SpeechTranscriber.supportedLocales
         let dictationLocales = await DictationTranscriber.supportedLocales
         guard !speechLocales.isEmpty || !dictationLocales.isEmpty else {
@@ -41,7 +46,8 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
             return try await transcribeSpeech(
                 audioAt: url,
                 locale: supportedLocale,
-                trackID: trackID
+                trackID: trackID,
+                progress: progress
             )
         }
 
@@ -49,7 +55,8 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
             return try await transcribeDictation(
                 audioAt: url,
                 locale: supportedLocale,
-                trackID: trackID
+                trackID: trackID,
+                progress: progress
             )
         }
 
@@ -60,7 +67,8 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         audioAt url: URL,
         locale: Locale,
         trackID: UUID,
-        startingAt time: TimeInterval
+        startingAt time: TimeInterval,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
     ) -> AsyncThrowingStream<SubtitleCue, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -79,6 +87,7 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
                             locale: supportedLocale,
                             trackID: trackID,
                             startingAt: time,
+                            progress: progress,
                             continuation: continuation
                         )
                     } else if let supportedLocale = await DictationTranscriber.supportedLocale(
@@ -89,6 +98,7 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
                             locale: supportedLocale,
                             trackID: trackID,
                             startingAt: time,
+                            progress: progress,
                             continuation: continuation
                         )
                     } else {
@@ -106,8 +116,10 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
     private func transcribeSpeech(
         audioAt url: URL,
         locale: Locale,
-        trackID: UUID
+        trackID: UUID,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
     ) async throws -> [SubtitleCue] {
+        progress(.extractingAudio)
         let extractedURL = try await audioExtractor.extract(from: url)
         defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = SpeechTranscriber(
@@ -115,7 +127,8 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
             preset: .timeIndexedTranscriptionWithAlternatives
         )
         let audioFile = try AVAudioFile(forReading: extractedURL)
-        try await installAssetsIfNeeded(for: transcriber)
+        try await installAssetsIfNeeded(for: transcriber, progress: progress)
+        progress(.recognizing)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let cues = collectSpeechResults(from: transcriber, trackID: trackID)
         try await analyze(audioFile, with: analyzer)
@@ -125,13 +138,16 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
     private func transcribeDictation(
         audioAt url: URL,
         locale: Locale,
-        trackID: UUID
+        trackID: UUID,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
     ) async throws -> [SubtitleCue] {
+        progress(.extractingAudio)
         let extractedURL = try await audioExtractor.extract(from: url)
         defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
         let audioFile = try AVAudioFile(forReading: extractedURL)
-        try await installAssetsIfNeeded(for: transcriber)
+        try await installAssetsIfNeeded(for: transcriber, progress: progress)
+        progress(.recognizing)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let cues = collectDictationResults(from: transcriber, trackID: trackID)
         try await analyze(audioFile, with: analyzer)
@@ -144,9 +160,20 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         return result
     }
 
-    private func installAssetsIfNeeded(for module: any SpeechModule) async throws {
+    private func installAssetsIfNeeded(
+        for module: any SpeechModule,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
+    ) async throws {
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
+            let progressTask = Task {
+                while !Task.isCancelled {
+                    progress(.preparingLanguage(installation.progress.fractionCompleted))
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+            defer { progressTask.cancel() }
             try await installation.downloadAndInstall()
+            progress(.preparingLanguage(1))
         }
         try Task.checkCancellation()
     }
@@ -164,13 +191,16 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         locale: Locale,
         trackID: UUID,
         startingAt time: TimeInterval,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void,
         continuation: AsyncThrowingStream<SubtitleCue, Error>.Continuation
     ) async throws {
+        progress(.extractingAudio)
         let extractedURL = try await audioExtractor.extract(from: url, startingAt: time)
         defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
         let audioFile = try AVAudioFile(forReading: extractedURL)
-        try await installAssetsIfNeeded(for: transcriber)
+        try await installAssetsIfNeeded(for: transcriber, progress: progress)
+        progress(.recognizing)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let analysis: Void = analyze(audioFile, with: analyzer)
 
@@ -188,13 +218,16 @@ struct AppleSpeechTranscriptionEngine: TranscriptionEngine {
         locale: Locale,
         trackID: UUID,
         startingAt time: TimeInterval,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void,
         continuation: AsyncThrowingStream<SubtitleCue, Error>.Continuation
     ) async throws {
+        progress(.extractingAudio)
         let extractedURL = try await audioExtractor.extract(from: url, startingAt: time)
         defer { try? FileManager.default.removeItem(at: extractedURL) }
         let transcriber = DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
         let audioFile = try AVAudioFile(forReading: extractedURL)
-        try await installAssetsIfNeeded(for: transcriber)
+        try await installAssetsIfNeeded(for: transcriber, progress: progress)
+        progress(.recognizing)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         async let analysis: Void = analyze(audioFile, with: analyzer)
 

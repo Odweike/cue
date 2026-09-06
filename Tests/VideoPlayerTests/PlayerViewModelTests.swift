@@ -199,6 +199,25 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isProgressiveTranscriptionEnabled)
         XCTAssertTrue(viewModel.subtitleTracks.isEmpty)
     }
+
+    func testLanguageAssetProgressIsExposedAndCanBeCancelled() async {
+        let viewModel = PlayerViewModel(
+            playbackEngine: PlaybackEngineSpy(),
+            transcriptionEngine: TranscriptionEngineStub()
+        )
+        viewModel.open(URL(fileURLWithPath: "/tmp/example.mp4"))
+        await viewModel.loadSupportedTranscriptionLocales()
+
+        viewModel.startTranscription()
+        for _ in 0..<20 where viewModel.languageAssetDownloadProgress == nil {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(viewModel.languageAssetDownloadProgress, 0.5)
+        viewModel.cancelLanguageAssetPreparation()
+        XCTAssertFalse(viewModel.transcriptionStatus.isRunning)
+        XCTAssertNil(viewModel.languageAssetDownloadProgress)
+    }
 }
 
 private struct TranscriptionEngineStub: TranscriptionEngine {
@@ -206,17 +225,26 @@ private struct TranscriptionEngineStub: TranscriptionEngine {
         [Locale(identifier: "en-US")]
     }
 
-    func transcribe(audioAt url: URL, locale: Locale, trackID: UUID) async throws -> [SubtitleCue] {
-        []
+    func transcribe(
+        audioAt url: URL,
+        locale: Locale,
+        trackID: UUID,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
+    ) async throws -> [SubtitleCue] {
+        progress(.preparingLanguage(0.5))
+        try await Task.sleep(for: .seconds(60))
+        return []
     }
 
     func progressiveTranscription(
         audioAt url: URL,
         locale: Locale,
         trackID: UUID,
-        startingAt time: TimeInterval
+        startingAt time: TimeInterval,
+        progress: @escaping @Sendable (TranscriptionActivity) -> Void
     ) -> AsyncThrowingStream<SubtitleCue, Error> {
         AsyncThrowingStream { continuation in
+            progress(.recognizing)
             continuation.yield(
                 SubtitleCue(
                     startTime: time,

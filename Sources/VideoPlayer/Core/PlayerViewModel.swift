@@ -24,6 +24,8 @@ final class PlayerViewModel {
     private(set) var subtitleStyleProfiles: [SubtitleStyleProfile]
     private(set) var supportedTranscriptionLocales: [Locale] = []
     private(set) var transcriptionStatus = TranscriptionStatus.idle
+    private(set) var transcriptionActivity: TranscriptionActivity?
+    private(set) var progressiveTranscriptionActivity: TranscriptionActivity?
     private(set) var isProgressiveTranscriptionEnabled = false
     private(set) var progressiveTranscriptionError: String?
     private(set) var selectedTranscriptionLocaleIdentifier: String
@@ -254,13 +256,20 @@ final class PlayerViewModel {
         let operationID = UUID()
         transcriptionID = operationID
         transcriptionStatus = .running
+        transcriptionActivity = .extractingAudio
 
         transcriptionTask = Task { [weak self, transcriptionEngine] in
             do {
                 let cues = try await transcriptionEngine.transcribe(
                     audioAt: videoURL,
                     locale: locale,
-                    trackID: trackID
+                    trackID: trackID,
+                    progress: { [weak self] activity in
+                        Task { @MainActor in
+                            guard let self, self.transcriptionID == operationID else { return }
+                            self.transcriptionActivity = activity
+                        }
+                    }
                 )
                 try Task.checkCancellation()
                 let outputURL = try SubtitleFileWriter.writeSRT(
@@ -292,6 +301,7 @@ final class PlayerViewModel {
         transcriptionTask = nil
         transcriptionID = nil
         transcriptionStatus = .idle
+        transcriptionActivity = nil
     }
 
     func setProgressiveTranscriptionEnabled(_ isEnabled: Bool) {
@@ -305,11 +315,13 @@ final class PlayerViewModel {
             progressiveTrackID = nil
             isProgressiveTranscriptionEnabled = false
             progressiveTranscriptionError = nil
+            progressiveTranscriptionActivity = nil
             return
         }
         guard currentURL != nil, !supportedTranscriptionLocales.isEmpty else { return }
         isProgressiveTranscriptionEnabled = true
         progressiveTranscriptionError = nil
+        progressiveTranscriptionActivity = .extractingAudio
         restartProgressiveTranscription(at: playbackState.currentTime)
     }
 
@@ -351,7 +363,13 @@ final class PlayerViewModel {
                     audioAt: videoURL,
                     locale: locale,
                     trackID: trackID,
-                    startingAt: time
+                    startingAt: time,
+                    progress: { [weak self] activity in
+                        Task { @MainActor in
+                            guard let self, self.progressiveTranscriptionID == operationID else { return }
+                            self.progressiveTranscriptionActivity = activity
+                        }
+                    }
                 )
                 for try await cue in stream {
                     try Task.checkCancellation()
@@ -363,6 +381,7 @@ final class PlayerViewModel {
                 }
                 guard let self, progressiveTranscriptionID == operationID else { return }
                 progressiveTranscriptionTask = nil
+                progressiveTranscriptionActivity = nil
             } catch is CancellationError {
                 return
             } catch {
@@ -370,6 +389,7 @@ final class PlayerViewModel {
                 progressiveTranscriptionTask = nil
                 progressiveTranscriptionID = nil
                 isProgressiveTranscriptionEnabled = false
+                progressiveTranscriptionActivity = nil
                 progressiveTranscriptionError = error.localizedDescription
             }
         }
@@ -380,6 +400,26 @@ final class PlayerViewModel {
         transcriptionTask = nil
         transcriptionID = nil
         transcriptionStatus = status
+        transcriptionActivity = nil
+    }
+
+    var languageAssetDownloadProgress: Double? {
+        if case .preparingLanguage(let progress) = transcriptionActivity {
+            return progress
+        }
+        if case .preparingLanguage(let progress) = progressiveTranscriptionActivity {
+            return progress
+        }
+        return nil
+    }
+
+    func cancelLanguageAssetPreparation() {
+        if transcriptionStatus.isRunning {
+            cancelTranscription()
+        }
+        if isProgressiveTranscriptionEnabled {
+            setProgressiveTranscriptionEnabled(false)
+        }
     }
 
     func localeName(_ locale: Locale) -> String {
