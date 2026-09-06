@@ -206,3 +206,9 @@ struct SubtitleStyle: Codable, Equatable, Sendable {
         try values.encode(alignment, forKey: .alignment)
     }
 }
+
+struct SubtitleStyleProfile: Codable, Equatable, Identifiable, Sendable {
+    let id: UUID
+    var name: String
+    var styles: [SubtitleStyle]
+}

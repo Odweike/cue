@@ -3,6 +3,7 @@ import SwiftUI
 struct SubtitleStyleEditor: View {
     let viewModel: PlayerViewModel
     @State private var selectedTrack = 0
+    @State private var profileName = ""
 
     var body: some View {
         Form {
@@ -63,6 +64,38 @@ struct SubtitleStyleEditor: View {
                 Text("Second").tag(1)
             }
             .pickerStyle(.segmented)
+
+            Section("Style Profiles") {
+                HStack {
+                    TextField("Profile name", text: $profileName)
+                    Button("Save") {
+                        if viewModel.saveSubtitleStyleProfile(named: profileName) {
+                            profileName = ""
+                        }
+                    }
+                    .disabled(profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                ForEach(viewModel.subtitleStyleProfiles) { profile in
+                    HStack {
+                        Button(profile.name) {
+                            viewModel.applySubtitleStyleProfile(profile.id)
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button(role: .destructive) {
+                            viewModel.deleteSubtitleStyleProfile(profile.id)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Delete profile")
+                        .accessibilityLabel("Delete \(profile.name)")
+                    }
+                }
+            }
 
             Section("Text") {
                 Picker("Font", selection: fontDesign) {

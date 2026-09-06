@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class PlayerViewModel {
     private static let subtitleStylesKey = "SubtitleStyles"
+    private static let subtitleStyleProfilesKey = "SubtitleStyleProfiles"
     private static let transcriptionLocaleKey = "TranscriptionLocale"
 
     let playbackEngine: any PlaybackEngine
@@ -20,6 +21,7 @@ final class PlayerViewModel {
     private(set) var subtitleTracks: [SubtitleTrack] = []
     private(set) var audioTracks: [AudioTrack] = []
     private(set) var subtitleStyles: [SubtitleStyle]
+    private(set) var subtitleStyleProfiles: [SubtitleStyleProfile]
     private(set) var supportedTranscriptionLocales: [Locale] = []
     private(set) var transcriptionStatus = TranscriptionStatus.idle
     private(set) var isProgressiveTranscriptionEnabled = false
@@ -35,6 +37,7 @@ final class PlayerViewModel {
         self.transcriptionEngine = transcriptionEngine
         self.userDefaults = userDefaults
         subtitleStyles = Self.loadSubtitleStyles(from: userDefaults)
+        subtitleStyleProfiles = Self.loadSubtitleStyleProfiles(from: userDefaults)
         selectedTranscriptionLocaleIdentifier = userDefaults.string(
             forKey: Self.transcriptionLocaleKey
         ) ?? Locale.current.identifier
@@ -184,6 +187,36 @@ final class PlayerViewModel {
         let defaults: [SubtitleStyle] = [.primary, .secondary]
         guard defaults.indices.contains(index) else { return }
         setSubtitleStyle(defaults[index], at: index)
+    }
+
+    @discardableResult
+    func saveSubtitleStyleProfile(named rawName: String) -> Bool {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return false }
+        if let index = subtitleStyleProfiles.firstIndex(where: {
+            $0.name.compare(name, options: .caseInsensitive) == .orderedSame
+        }) {
+            subtitleStyleProfiles[index].name = name
+            subtitleStyleProfiles[index].styles = subtitleStyles
+        } else {
+            subtitleStyleProfiles.append(
+                SubtitleStyleProfile(id: UUID(), name: name, styles: subtitleStyles)
+            )
+        }
+        saveSubtitleStyleProfiles()
+        return true
+    }
+
+    func applySubtitleStyleProfile(_ id: UUID) {
+        guard let profile = subtitleStyleProfiles.first(where: { $0.id == id }),
+              profile.styles.count == 2 else { return }
+        subtitleStyles = profile.styles.map { $0.normalized() }
+        saveSubtitleStyles()
+    }
+
+    func deleteSubtitleStyleProfile(_ id: UUID) {
+        subtitleStyleProfiles.removeAll { $0.id == id }
+        saveSubtitleStyleProfiles()
     }
 
     func loadSupportedTranscriptionLocales() async {
@@ -365,5 +398,18 @@ final class PlayerViewModel {
     private func saveSubtitleStyles() {
         guard let data = try? JSONEncoder().encode(subtitleStyles) else { return }
         userDefaults.set(data, forKey: Self.subtitleStylesKey)
+    }
+
+    private static func loadSubtitleStyleProfiles(from userDefaults: UserDefaults) -> [SubtitleStyleProfile] {
+        guard let data = userDefaults.data(forKey: subtitleStyleProfilesKey),
+              let profiles = try? JSONDecoder().decode([SubtitleStyleProfile].self, from: data) else {
+            return []
+        }
+        return profiles.filter { $0.styles.count == 2 }
+    }
+
+    private func saveSubtitleStyleProfiles() {
+        guard let data = try? JSONEncoder().encode(subtitleStyleProfiles) else { return }
+        userDefaults.set(data, forKey: Self.subtitleStyleProfilesKey)
     }
 }

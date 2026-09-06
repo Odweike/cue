@@ -150,6 +150,35 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(style.fontWeight, .semibold)
     }
 
+    func testSubtitleStyleProfilesPersistAndApplyBothTracks() {
+        let suiteName = "PlayerViewModelTests.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        defer { userDefaults.removePersistentDomain(forName: suiteName) }
+        let viewModel = PlayerViewModel(
+            playbackEngine: PlaybackEngineSpy(),
+            userDefaults: userDefaults
+        )
+        var first = SubtitleStyle.primary
+        first.fontSize = 40
+        var second = SubtitleStyle.secondary
+        second.position = .top
+        viewModel.setSubtitleStyle(first, at: 0)
+        viewModel.setSubtitleStyle(second, at: 1)
+
+        XCTAssertTrue(viewModel.saveSubtitleStyleProfile(named: "Cinema"))
+        viewModel.resetSubtitleStyle(at: 0)
+        viewModel.resetSubtitleStyle(at: 1)
+        viewModel.applySubtitleStyleProfile(viewModel.subtitleStyleProfiles[0].id)
+        let restored = PlayerViewModel(
+            playbackEngine: PlaybackEngineSpy(),
+            userDefaults: userDefaults
+        )
+
+        XCTAssertEqual(viewModel.subtitleStyles, [first, second])
+        XCTAssertEqual(restored.subtitleStyleProfiles.first?.name, "Cinema")
+        XCTAssertEqual(restored.subtitleStyleProfiles.first?.styles, [first, second])
+    }
+
     func testProgressiveTranscriptionAddsCuesAsTheyArrive() async {
         let viewModel = PlayerViewModel(
             playbackEngine: PlaybackEngineSpy(),
