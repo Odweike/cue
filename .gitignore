@@ -4,4 +4,6 @@ Derived/
 DerivedData/
 VideoPlayer.xcodeproj/
 VideoPlayer.xcworkspace/
-
+dist/
+*.dmg
+.release/
