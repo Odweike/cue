@@ -37,7 +37,7 @@ Cue plays common local video files (MKV, MP4, MOV, and more) through an embedded
 ## Install
 
 1. Open the [Releases](https://github.com/Odweike/cue/releases/latest) page.
-2. Download **Cue-0.1.0.dmg**.
+2. Download **Cue-0.1.1.dmg**.
 3. Open the disk image and drag **Cue** into **Applications**.
 4. Launch Cue from Applications.
 
@@ -80,7 +80,7 @@ xcodebuild \
 Package a disk image after a successful Release build:
 
 ```sh
-./scripts/package-dmg.sh 0.1.0
+./scripts/package-dmg.sh 0.1.1
 ```
 
 ## Architecture

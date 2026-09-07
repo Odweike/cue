@@ -52,6 +52,20 @@ struct PlaybackState: Equatable, Sendable {
     var deinterlacing = false
     var videoEqualizer = VideoEqualizer()
     var audioDelay: TimeInterval = 0
+
+    func hasSameControls(as other: PlaybackState) -> Bool {
+        volume == other.volume
+            && isMuted == other.isMuted
+            && playbackRate == other.playbackRate
+            && videoScalingMode == other.videoScalingMode
+            && aspectRatio == other.aspectRatio
+            && cropRatio == other.cropRatio
+            && rotation == other.rotation
+            && hardwareDecoding == other.hardwareDecoding
+            && deinterlacing == other.deinterlacing
+            && videoEqualizer == other.videoEqualizer
+            && audioDelay == other.audioDelay
+    }
 }
 
 @MainActor
@@ -63,7 +77,7 @@ protocol PlaybackEngine: AnyObject {
     func open(_ url: URL)
     func play()
     func pause()
-    func seek(to time: TimeInterval)
+    func seek(to time: TimeInterval, exact: Bool)
     func skip(by interval: TimeInterval)
     func setVolume(_ volume: Float)
     func setMuted(_ isMuted: Bool)
@@ -76,6 +90,7 @@ protocol PlaybackEngine: AnyObject {
     func setDeinterlacing(_ isEnabled: Bool)
     func setVideoEqualizer(_ equalizer: VideoEqualizer)
     func audioTracks() -> [AudioTrack]
+    func subtitleStreams() -> [SubtitleStream]
     func selectAudioTrack(_ id: Int64)
     func setAudioDelay(_ delay: TimeInterval)
 }

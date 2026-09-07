@@ -51,6 +51,7 @@ enum SubtitleParser {
               let end = timestamp(parts[1]) else { return nil }
 
         let text = lines.dropFirst(timingIndex + 1).joined(separator: "\n")
+            .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, end > start else { return nil }
         return SubtitleCue(startTime: start, endTime: end, text: text, trackID: trackID)

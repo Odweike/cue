@@ -34,6 +34,16 @@ final class SubtitleParserTests: XCTestCase {
         XCTAssertEqual(assCue.text, "Third\nline")
     }
 
+    func testStripsHTMLTagsFromSRT() throws {
+        let srt = """
+        1
+        00:00:01,000 --> 00:00:02,000
+        <i>Hello</i>
+        """
+        let cue = try XCTUnwrap(SubtitleParser.parse(srt, fileExtension: "srt", trackID: UUID()).first)
+        XCTAssertEqual(cue.text, "Hello")
+    }
+
     func testWritesSRTWithMillisecondTimestamps() {
         let trackID = UUID()
         let contents = SubtitleFileWriter.srtContents(for: [
@@ -49,5 +59,26 @@ final class SubtitleParserTests: XCTestCase {
             contents,
             "1\n00:00:01,250 --> 00:00:03,875\nHello\nworld\n"
         )
+    }
+
+    func testFormatsHourLongTimecodesWithoutTruncation() {
+        XCTAssertEqual(
+            PlaybackTimeFormat.string(from: 3_619, includingHours: true),
+            "1:00:19"
+        )
+    }
+
+    func testFindsSidecarSubtitlesNextToTheVideo() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CueSidecar-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let video = folder.appendingPathComponent("Movie.mkv")
+        try Data().write(to: video)
+        let srt = folder.appendingPathComponent("Movie.en.srt")
+        try Data().write(to: srt)
+        try Data().write(to: folder.appendingPathComponent("Other.srt"))
+
+        XCTAssertEqual(SidecarSubtitleLocator.urls(beside: video).map(\.lastPathComponent), ["Movie.en.srt"])
     }
 }

@@ -119,7 +119,7 @@ struct SubtitleStyleEditor: View {
 
                 LabeledContent("Size") {
                     HStack {
-                        Slider(value: fontSize, in: 14...52, step: 1)
+                        Slider(value: fontSize, in: 14...52)
                         Text("\(Int(style.wrappedValue.fontSize)) pt")
                             .monospacedDigit()
                             .frame(width: 48, alignment: .trailing)
@@ -138,7 +138,7 @@ struct SubtitleStyleEditor: View {
 
                 LabeledContent("Width") {
                     HStack {
-                        Slider(value: outlineWidth, in: 0...4, step: 0.5)
+                        Slider(value: outlineWidth, in: 0...4)
                         Text(String(format: "%.1f", style.wrappedValue.outlineWidth))
                             .monospacedDigit()
                             .frame(width: 28, alignment: .trailing)
@@ -152,7 +152,7 @@ struct SubtitleStyleEditor: View {
                 }
 
                 LabeledContent("Opacity") {
-                    Slider(value: backgroundOpacity, in: 0...0.9, step: 0.05)
+                    Slider(value: backgroundOpacity, in: 0...0.9)
                 }
             }
 
@@ -177,7 +177,7 @@ struct SubtitleStyleEditor: View {
 
                 if style.wrappedValue.position == .custom {
                     LabeledContent("Height") {
-                        Slider(value: verticalOffset, in: 20...360, step: 5)
+                        Slider(value: verticalOffset, in: 20...360)
                     }
                 }
             }
@@ -187,9 +187,6 @@ struct SubtitleStyleEditor: View {
             }
         }
         .formStyle(.grouped)
-        .task {
-            await viewModel.loadSupportedTranscriptionLocales()
-        }
         .sheet(isPresented: languageAssetSheetPresented) {
             LanguageAssetSheet(
                 languageName: viewModel.localeName(

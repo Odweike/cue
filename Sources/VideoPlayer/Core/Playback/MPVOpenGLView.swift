@@ -5,6 +5,32 @@ import OpenGL.GL
 final class MPVOpenGLView: NSOpenGLView {
     nonisolated(unsafe) private var renderContext: OpaquePointer?
 
+    override var acceptsFirstResponder: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        super.mouseDown(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 49 {
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.keyCode == 49,
+              event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else {
+            return super.performKeyEquivalent(with: event)
+        }
+        let responder = window?.firstResponder
+        if responder is NSTextView || responder is NSTextField {
+            return false
+        }
+        return true
+    }
+
     override class func defaultPixelFormat() -> NSOpenGLPixelFormat {
         let attributes: [NSOpenGLPixelFormatAttribute] = [
             NSOpenGLPixelFormatAttribute(NSOpenGLPFADoubleBuffer),
@@ -54,8 +80,13 @@ final class MPVOpenGLView: NSOpenGLView {
         )
     }
 
+    private var lastBackingSize = CGSize.zero
+
     override func reshape() {
         super.reshape()
+        let size = convertToBacking(bounds).size
+        guard size != lastBackingSize else { return }
+        lastBackingSize = size
         openGLContext?.update()
         needsDisplay = true
     }

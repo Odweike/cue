@@ -9,14 +9,22 @@ final class PlayerViewModel {
     private static let transcriptionLocaleKey = "TranscriptionLocale"
 
     let playbackEngine: any PlaybackEngine
-    private let transcriptionEngine: any TranscriptionEngine
+    private var transcriptionEngine: any TranscriptionEngine
+    private let subtitleExtractor = SubtitleExtractor()
     private let userDefaults: UserDefaults
     private var transcriptionTask: Task<Void, Never>?
     private var transcriptionID: UUID?
     private var progressiveTranscriptionTask: Task<Void, Never>?
     private var progressiveTranscriptionID: UUID?
     private var progressiveTrackID: UUID?
+    private var accessedFileURL: URL?
+    private var mediaLoadID = UUID()
+    private var subtitleLoadTask: Task<Void, Never>?
+    private var lastScrubSeek = Date.distantPast
     private(set) var currentURL: URL?
+    private(set) var currentTime: TimeInterval = 0
+    private(set) var duration: TimeInterval = 0
+    private(set) var isPlaying = false
     private(set) var playbackState = PlaybackState()
     private(set) var subtitleTracks: [SubtitleTrack] = []
     private(set) var audioTracks: [AudioTrack] = []
@@ -29,6 +37,9 @@ final class PlayerViewModel {
     private(set) var isProgressiveTranscriptionEnabled = false
     private(set) var progressiveTranscriptionError: String?
     private(set) var selectedTranscriptionLocaleIdentifier: String
+    private(set) var isSettingsPresented = false
+    private(set) var isScrubbing = false
+    private(set) var scrubTime: TimeInterval = 0
 
     init(
         playbackEngine: any PlaybackEngine,
@@ -46,21 +57,39 @@ final class PlayerViewModel {
     }
 
     func open(_ url: URL) {
+        let fileURL = url.resolvingSymlinksInPath().standardizedFileURL
+        if currentURL == fileURL { return }
+
+        accessedFileURL?.stopAccessingSecurityScopedResource()
+        accessedFileURL = fileURL.startAccessingSecurityScopedResource() ? fileURL : nil
+
         cancelTranscription()
         setProgressiveTranscriptionEnabled(false)
+        subtitleLoadTask?.cancel()
         subtitleTracks.removeAll()
         audioTracks.removeAll()
-        playbackEngine.open(url)
-        currentURL = url
+        isScrubbing = false
+        playbackEngine.open(fileURL)
+        currentURL = fileURL
         refreshPlaybackState()
+        refreshAudioTracks()
+        startSubtitleLoad(for: fileURL)
     }
 
     func refreshPlaybackState() {
-        playbackState = playbackEngine.state
+        let state = playbackEngine.state
+        if !isScrubbing {
+            currentTime = state.currentTime
+            duration = state.duration
+            isPlaying = state.isPlaying
+        }
+        if !state.hasSameControls(as: playbackState) {
+            playbackState = state
+        }
     }
 
     func togglePlayback() {
-        if playbackState.isPlaying {
+        if isPlaying {
             playbackEngine.pause()
         } else {
             playbackEngine.play()
@@ -69,8 +98,36 @@ final class PlayerViewModel {
     }
 
     func seek(to time: TimeInterval) {
-        playbackEngine.seek(to: time)
+        playbackEngine.seek(to: time, exact: true)
         refreshPlaybackState()
+    }
+
+    func beginScrubbing() {
+        guard !isScrubbing else { return }
+        isScrubbing = true
+        scrubTime = currentTime
+    }
+
+    func updateScrubbing(to time: TimeInterval) {
+        if !isScrubbing {
+            isScrubbing = true
+        }
+        scrubTime = time
+        let now = Date()
+        guard now.timeIntervalSince(lastScrubSeek) >= 0.08 else { return }
+        lastScrubSeek = now
+        playbackEngine.seek(to: time, exact: false)
+    }
+
+    func endScrubbing() {
+        playbackEngine.seek(to: scrubTime, exact: true)
+        isScrubbing = false
+        refreshPlaybackState()
+        playbackPositionDidJump()
+    }
+
+    func toggleSettingsPresented() {
+        isSettingsPresented.toggle()
     }
 
     func skip(by interval: TimeInterval) {
@@ -148,7 +205,7 @@ final class PlayerViewModel {
     }
 
     var visibleSubtitleCues: [SubtitleCue] {
-        let time = playbackState.currentTime
+        let time = isScrubbing ? scrubTime : currentTime
         return subtitleTracks
             .filter(\.isEnabled)
             .flatMap(\.cues)
@@ -156,12 +213,11 @@ final class PlayerViewModel {
     }
 
     func importSubtitles(_ url: URL) throws {
-        let trackID = UUID()
-        let contents = try String(contentsOf: url, encoding: .utf8)
-        let cues = try SubtitleParser.parse(contents, fileExtension: url.pathExtension, trackID: trackID)
-        let isEnabled = subtitleTracks.filter(\.isEnabled).count < 2
-        subtitleTracks.append(
-            SubtitleTrack(id: trackID, name: url.lastPathComponent, cues: cues, isEnabled: isEnabled)
+        try appendSubtitleTrack(
+            name: url.lastPathComponent,
+            contents: String(contentsOf: url, encoding: .utf8),
+            fileExtension: url.pathExtension,
+            autoEnable: true
         )
     }
 
@@ -322,7 +378,7 @@ final class PlayerViewModel {
         isProgressiveTranscriptionEnabled = true
         progressiveTranscriptionError = nil
         progressiveTranscriptionActivity = .extractingAudio
-        restartProgressiveTranscription(at: playbackState.currentTime)
+        restartProgressiveTranscription(at: currentTime)
     }
 
     func playbackPositionDidJump() {
@@ -331,7 +387,7 @@ final class PlayerViewModel {
 
     private func restartProgressiveTranscriptionIfNeeded() {
         guard isProgressiveTranscriptionEnabled else { return }
-        restartProgressiveTranscription(at: playbackState.currentTime)
+        restartProgressiveTranscription(at: currentTime)
     }
 
     private func restartProgressiveTranscription(at time: TimeInterval) {
@@ -424,6 +480,74 @@ final class PlayerViewModel {
 
     func localeName(_ locale: Locale) -> String {
         Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+    }
+
+    private func startSubtitleLoad(for fileURL: URL) {
+        let loadID = UUID()
+        mediaLoadID = loadID
+        subtitleLoadTask = Task { [weak self] in
+            await self?.loadSubtitleSources(for: fileURL, loadID: loadID)
+        }
+    }
+
+    private func loadSubtitleSources(for fileURL: URL, loadID: UUID) async {
+        for url in SidecarSubtitleLocator.urls(beside: fileURL) {
+            guard !Task.isCancelled, mediaLoadID == loadID else { return }
+            try? appendSubtitleTrack(
+                name: url.lastPathComponent,
+                contents: String(contentsOf: url, encoding: .utf8),
+                fileExtension: url.pathExtension,
+                autoEnable: true
+            )
+        }
+
+        var streams: [SubtitleStream] = []
+        for _ in 0..<40 {
+            guard !Task.isCancelled, mediaLoadID == loadID else { return }
+            streams = playbackEngine.subtitleStreams().filter(\.isTextCodec)
+            if !streams.isEmpty { break }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        for stream in streams {
+            guard !Task.isCancelled, mediaLoadID == loadID else { return }
+            do {
+                let contents = try await subtitleExtractor.extract(from: fileURL, stream: stream)
+                try appendSubtitleTrack(
+                    name: stream.displayName,
+                    contents: contents,
+                    fileExtension: stream.fileExtension,
+                    autoEnable: shouldAutoEnable(stream)
+                )
+            } catch {
+                continue
+            }
+        }
+    }
+
+    private func shouldAutoEnable(_ stream: SubtitleStream) -> Bool {
+        guard !stream.isForced else { return false }
+        let preferred = Locale.current.language.languageCode?.identifier.lowercased()
+        if let preferred, stream.language?.lowercased().hasPrefix(preferred) == true {
+            return true
+        }
+        return stream.isDefault
+    }
+
+    @discardableResult
+    private func appendSubtitleTrack(
+        name: String,
+        contents: String,
+        fileExtension: String,
+        autoEnable: Bool
+    ) throws -> Bool {
+        let trackID = UUID()
+        let cues = try SubtitleParser.parse(contents, fileExtension: fileExtension, trackID: trackID)
+        let isEnabled = autoEnable && subtitleTracks.filter(\.isEnabled).count < 2
+        subtitleTracks.append(
+            SubtitleTrack(id: trackID, name: name, cues: cues, isEnabled: isEnabled)
+        )
+        return true
     }
 
     private static func loadSubtitleStyles(from userDefaults: UserDefaults) -> [SubtitleStyle] {

@@ -40,3 +40,16 @@ struct OpenVideoCommands: Commands {
         }
     }
 }
+
+struct PlaybackCommands: Commands {
+    let viewModel: PlayerViewModel
+
+    var body: some Commands {
+        CommandMenu("Playback") {
+            Button(viewModel.isPlaying ? "Pause" : "Play") {
+                viewModel.togglePlayback()
+            }
+            .disabled(viewModel.currentURL == nil)
+        }
+    }
+}

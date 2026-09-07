@@ -4,9 +4,8 @@ import SwiftUI
 
 struct FloatingControlBar: View {
     let viewModel: PlayerViewModel
-    private let refreshTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
+    private let refreshTimer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     @State private var showsSubtitles = false
-    @State private var showsSettings = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -65,12 +64,12 @@ struct FloatingControlBar: View {
             Button {
                 viewModel.togglePlayback()
             } label: {
-                Image(systemName: viewModel.playbackState.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 29, weight: .medium))
                     .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(viewModel.playbackState.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play")
 
             controlButton("forward.fill", size: 22, label: "Forward 10 seconds") {
                 viewModel.skip(by: 10)
@@ -98,14 +97,11 @@ struct FloatingControlBar: View {
             }
 
             Button {
-                showsSettings.toggle()
+                viewModel.toggleSettingsPresented()
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
             .help("Playback Settings")
-            .popover(isPresented: $showsSettings, arrowEdge: .leading) {
-                PlaybackSettingsPanel(viewModel: viewModel)
-            }
         }
         .font(.system(size: 17, weight: .medium))
         .buttonStyle(.plain)
@@ -113,31 +109,40 @@ struct FloatingControlBar: View {
     }
 
     private var timeline: some View {
-        HStack(spacing: 10) {
-            Text(format(viewModel.playbackState.currentTime))
+        let showsHours = viewModel.duration >= 3_600
+        let displayedTime = viewModel.isScrubbing
+            ? viewModel.scrubTime
+            : viewModel.currentTime
+
+        return HStack(spacing: 10) {
+            Text(PlaybackTimeFormat.string(from: displayedTime, includingHours: showsHours))
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .frame(width: 62, alignment: .leading)
+                .frame(minWidth: 82, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
 
             Slider(
                 value: Binding(
-                    get: { viewModel.playbackState.currentTime },
-                    set: { viewModel.seek(to: $0) }
+                    get: { displayedTime },
+                    set: { viewModel.updateScrubbing(to: $0) }
                 ),
-                in: 0...max(viewModel.playbackState.duration, 0.01),
+                in: 0...max(viewModel.duration, 0.01),
                 onEditingChanged: { isEditing in
-                    if !isEditing {
-                        viewModel.playbackPositionDidJump()
+                    if isEditing {
+                        viewModel.beginScrubbing()
+                    } else {
+                        viewModel.endScrubbing()
                     }
                 }
             )
             .tint(.white.opacity(0.9))
             .accessibilityLabel("Timeline")
 
-            Text(format(viewModel.playbackState.duration))
+            Text(PlaybackTimeFormat.string(from: viewModel.duration, includingHours: showsHours))
                 .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .frame(width: 62, alignment: .trailing)
+                .frame(minWidth: 82, alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
         }
     }
 
@@ -166,16 +171,6 @@ struct FloatingControlBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-    }
-
-    private func format(_ seconds: TimeInterval) -> String {
-        let total = max(Int(seconds.rounded(.down)), 0)
-        let hours = total / 3_600
-        let minutes = total % 3_600 / 60
-        let remainingSeconds = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
-            : String(format: "%02d:%02d", minutes, remainingSeconds)
     }
 }
 

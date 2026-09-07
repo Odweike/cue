@@ -29,6 +29,9 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertEqual(engine.currentURL, url)
         XCTAssertEqual(viewModel.currentURL, url)
+
+        viewModel.open(url)
+        XCTAssertEqual(engine.openCount, 1)
     }
 
     func testVideoFileValidationAcceptsMoviesAndRejectsOtherFiles() {
@@ -69,6 +72,18 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.audioDelay, 0.4)
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.skipInterval, 10)
+    }
+
+    func testScrubbingSeeksWithKeyframesUntilRelease() {
+        let engine = PlaybackEngineSpy()
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+
+        viewModel.updateScrubbing(to: 80)
+        XCTAssertEqual(engine.seekTime, 80)
+        XCTAssertEqual(engine.seekExact, false)
+
+        viewModel.endScrubbing()
+        XCTAssertEqual(engine.seekExact, true)
     }
 
     func testMuteTogglePreservesVolume() {
@@ -262,6 +277,7 @@ private struct TranscriptionEngineStub: TranscriptionEngine {
 private final class PlaybackEngineSpy: PlaybackEngine {
     let renderView = NSView()
     private(set) var currentURL: URL?
+    private(set) var openCount = 0
     var state = PlaybackState()
     private(set) var volume: Float?
     private(set) var isMuted: Bool?
@@ -277,17 +293,20 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     private(set) var selectedAudioTrackID: Int64?
     private(set) var audioDelay: TimeInterval?
     private(set) var seekTime: TimeInterval?
+    private(set) var seekExact: Bool?
     private(set) var skipInterval: TimeInterval?
 
     func open(_ url: URL) {
         currentURL = url
+        openCount += 1
     }
 
     func play() {}
     func pause() {}
 
-    func seek(to time: TimeInterval) {
+    func seek(to time: TimeInterval, exact: Bool) {
         seekTime = time
+        seekExact = exact
     }
 
     func skip(by interval: TimeInterval) {
@@ -338,6 +357,10 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func audioTracks() -> [AudioTrack] {
         availableAudioTracks
+    }
+
+    func subtitleStreams() -> [SubtitleStream] {
+        []
     }
 
     func selectAudioTrack(_ id: Int64) {

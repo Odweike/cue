@@ -3,8 +3,8 @@ import ProjectDescription
 let baseSettings: [String: SettingValue] = [
     "SWIFT_VERSION": "6.0",
     "MACOSX_DEPLOYMENT_TARGET": "26.0",
-    "MARKETING_VERSION": "0.1.0",
-    "CURRENT_PROJECT_VERSION": "1",
+    "MARKETING_VERSION": "0.1.1",
+    "CURRENT_PROJECT_VERSION": "3",
     "CODE_SIGN_STYLE": "Automatic",
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
 ]
@@ -13,6 +13,8 @@ var appSettings = baseSettings
 appSettings["PRODUCT_NAME"] = "Cue"
 appSettings["EXECUTABLE_NAME"] = "VideoPlayer"
 appSettings["PRODUCT_MODULE_NAME"] = "VideoPlayer"
+appSettings["DEVELOPMENT_TEAM"] = "95TC3M7268"
+appSettings["CODE_SIGN_IDENTITY"] = "Apple Development"
 
 let project = Project(
     name: "VideoPlayer",
@@ -39,6 +41,12 @@ let project = Project(
                 "CFBundleName": "Cue",
                 "NSMainStoryboardFile": "",
                 "NSSpeechRecognitionUsageDescription": "Cue uses on-device speech recognition to generate subtitles for videos you choose.",
+                "NSDesktopFolderUsageDescription": "Cue reads video files you open from the Desktop.",
+                "NSDocumentsFolderUsageDescription": "Cue reads video files you open from Documents.",
+                "NSDownloadsFolderUsageDescription": "Cue reads video files you open from Downloads.",
+                "NSRemovableVolumesUsageDescription": "Cue reads video files you open from external drives.",
+                "NSNetworkVolumesUsageDescription": "Cue reads video files you open from network volumes.",
+                "LSSupportsOpeningDocumentsInPlace": true,
                 "CFBundleShortVersionString": "$(MARKETING_VERSION)",
                 "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
                 "CFBundleDocumentTypes": .array([

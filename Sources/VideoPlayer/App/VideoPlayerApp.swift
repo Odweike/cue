@@ -1,17 +1,23 @@
+import AppKit
 import SwiftUI
+
+@MainActor
+final class CueAppDelegate: NSObject, NSApplicationDelegate {
+    let viewModel = PlayerViewModel(playbackEngine: MPVPlaybackEngine())
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first(where: VideoFilePicker.canOpen) else { return }
+        viewModel.open(url)
+    }
+}
 
 @main
 struct CueApp: App {
-    @State private var viewModel: PlayerViewModel
-
-    init() {
-        let engine = MPVPlaybackEngine()
-        _viewModel = State(initialValue: PlayerViewModel(playbackEngine: engine))
-    }
+    @NSApplicationDelegateAdaptor(CueAppDelegate.self) private var appDelegate
 
     var body: some Scene {
         Window("Cue", id: "main") {
-            PlayerRootView(viewModel: viewModel)
+            PlayerRootView(viewModel: appDelegate.viewModel)
                 .frame(
                     minWidth: 720,
                     maxWidth: .infinity,
@@ -21,7 +27,8 @@ struct CueApp: App {
         }
         .defaultSize(width: 1_000, height: 640)
         .commands {
-            OpenVideoCommands(viewModel: viewModel)
+            OpenVideoCommands(viewModel: appDelegate.viewModel)
+            PlaybackCommands(viewModel: appDelegate.viewModel)
             LicensesCommands()
         }
 

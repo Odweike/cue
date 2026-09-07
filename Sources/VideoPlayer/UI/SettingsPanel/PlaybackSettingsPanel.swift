@@ -15,17 +15,27 @@ struct PlaybackSettingsPanel: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            switch selectedTab {
-            case .video:
+            ZStack(alignment: .top) {
                 videoSettings
-            case .audio:
+                    .opacity(selectedTab == .video ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .video)
+
                 audioSettings
-            case .subtitles:
+                    .opacity(selectedTab == .audio ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .audio)
+
                 SubtitleStyleEditor(viewModel: viewModel)
+                    .opacity(selectedTab == .subtitles ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .subtitles)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .transaction { $0.animation = nil }
         }
         .padding(16)
-        .frame(width: 430, height: 580)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .task {
+            await viewModel.loadSupportedTranscriptionLocales()
+        }
     }
 
     private var videoSettings: some View {
@@ -54,9 +64,9 @@ struct PlaybackSettingsPanel: View {
             }
 
             Section("Playback") {
-                HStack {
+                HStack(alignment: .center) {
                     Text("Speed")
-                    Slider(value: playbackRate, in: 0.25...16, step: 0.25)
+                    RulerSlider(value: playbackRate, range: 0.25...16, step: 0.25, majorEvery: 4)
                     Text(String(format: "%.2f×", viewModel.playbackState.playbackRate))
                         .monospacedDigit()
                         .fixedSize()
@@ -110,9 +120,9 @@ struct PlaybackSettingsPanel: View {
             }
 
             Section("Synchronization") {
-                HStack {
+                HStack(alignment: .center) {
                     Text("Audio Delay")
-                    Slider(value: audioDelay, in: -5...5, step: 0.1)
+                    RulerSlider(value: audioDelay, range: -5...5, step: 0.1, majorEvery: 10)
                     Text(String(format: "%+.1f s", viewModel.playbackState.audioDelay))
                         .monospacedDigit()
                         .frame(width: 54, alignment: .trailing)
@@ -124,9 +134,6 @@ struct PlaybackSettingsPanel: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            viewModel.refreshAudioTracks()
-        }
     }
 
     private var scalingMode: Binding<VideoScalingMode> {
@@ -243,7 +250,7 @@ private struct AdjustmentRow: View {
         HStack {
             Text(title)
                 .frame(width: 76, alignment: .leading)
-            Slider(value: $value, in: -100...100, step: 1)
+            Slider(value: $value, in: -100...100)
             Text("\(Int(value))")
                 .monospacedDigit()
                 .frame(width: 34, alignment: .trailing)

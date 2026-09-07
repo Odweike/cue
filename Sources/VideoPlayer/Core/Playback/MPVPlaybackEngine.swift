@@ -51,6 +51,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setOption("terminal", to: "no")
         setOption("osc", to: "no")
         setOption("input-default-bindings", to: "no")
+        setOption("input-vo-keyboard", to: "no")
         setOption("input-media-keys", to: "no")
         setOption("ytdl", to: "no")
         setOption("keep-open", to: "yes")
@@ -61,6 +62,8 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setOption("video-align-y", to: "0")
         setOption("vo", to: "libmpv")
         setOption("hwdec", to: "videotoolbox-copy")
+        setOption("sid", to: "no")
+        setOption("sub-visibility", to: "no")
 
         let status = mpv_initialize(context)
         precondition(status >= 0, "Could not initialize mpv: \(Self.errorMessage(for: status))")
@@ -81,7 +84,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
 
     func open(_ url: URL) {
         currentURL = url
-        command("loadfile", url.path, "replace")
+        command("loadfile", url.path(percentEncoded: false), "replace")
     }
 
     func play() {
@@ -92,9 +95,9 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setFlag("pause", to: true)
     }
 
-    func seek(to time: TimeInterval) {
-        let target = min(max(time, 0), state.duration)
-        command("seek", String(target), "absolute")
+    func seek(to time: TimeInterval, exact: Bool) {
+        let mode = exact ? "absolute+exact" : "absolute+keyframes"
+        command("seek", String(max(time, 0)), mode)
     }
 
     func skip(by interval: TimeInterval) {
@@ -165,6 +168,27 @@ final class MPVPlaybackEngine: PlaybackEngine {
                 codec: stringProperty("\(prefix)/codec"),
                 channelCount: Int(int64Property("\(prefix)/demux-channel-count")),
                 isSelected: boolProperty("\(prefix)/selected")
+            )
+        }
+    }
+
+    func subtitleStreams() -> [SubtitleStream] {
+        let count = max(int64Property("track-list/count"), 0)
+        var subtitleOrdinal = 0
+        return (0..<count).compactMap { index in
+            let prefix = "track-list/\(index)"
+            guard stringProperty("\(prefix)/type") == "sub" else { return nil }
+            defer { subtitleOrdinal += 1 }
+            let title = stringProperty("\(prefix)/title")
+            return SubtitleStream(
+                id: int64Property("\(prefix)/id"),
+                ffmpegMap: "0:s:\(subtitleOrdinal)",
+                title: title,
+                language: stringProperty("\(prefix)/lang"),
+                codec: stringProperty("\(prefix)/codec"),
+                isForced: boolProperty("\(prefix)/forced")
+                    || title?.localizedCaseInsensitiveContains("forced") == true,
+                isDefault: boolProperty("\(prefix)/default")
             )
         }
     }

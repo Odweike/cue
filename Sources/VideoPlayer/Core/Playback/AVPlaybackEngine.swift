@@ -56,13 +56,17 @@ final class AVPlaybackEngine: PlaybackEngine {
         player.pause()
     }
 
-    func seek(to time: TimeInterval) {
+    func seek(to time: TimeInterval, exact: Bool) {
         let target = min(max(time, 0), state.duration)
-        player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        player.seek(
+            to: CMTime(seconds: target, preferredTimescale: 600),
+            toleranceBefore: exact ? .zero : CMTime(seconds: 1, preferredTimescale: 600),
+            toleranceAfter: exact ? .zero : CMTime(seconds: 1, preferredTimescale: 600)
+        )
     }
 
     func skip(by interval: TimeInterval) {
-        seek(to: state.currentTime + interval)
+        seek(to: state.currentTime + interval, exact: true)
     }
 
     func setVolume(_ volume: Float) {
@@ -110,6 +114,10 @@ final class AVPlaybackEngine: PlaybackEngine {
     }
 
     func audioTracks() -> [AudioTrack] {
+        []
+    }
+
+    func subtitleStreams() -> [SubtitleStream] {
         []
     }
 
