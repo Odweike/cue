@@ -39,4 +39,43 @@ final class FloatingControlsGeometryTests: XCTestCase {
             0.72
         )
     }
+
+    func testPanelOriginAndOffsetRoundTrip() {
+        let availableSize = CGSize(width: 1_000, height: 608)
+        let panelSize = CGSize(width: 620, height: 132)
+        let offset = CGSize(width: -80, height: -120)
+        let origin = FloatingControlsOverlay.origin(
+            for: offset,
+            panelSize: panelSize,
+            availableSize: availableSize
+        )
+        let roundTrip = FloatingControlsOverlay.offset(
+            from: origin,
+            panelSize: panelSize,
+            availableSize: availableSize
+        )
+
+        XCTAssertEqual(roundTrip.width, offset.width)
+        XCTAssertEqual(roundTrip.height, offset.height)
+    }
+
+    func testClampedOffsetStaysInsideWindow() {
+        let availableSize = CGSize(width: 800, height: 500)
+        let panelSize = CGSize(width: 500, height: 116)
+        let clamped = FloatingControlsOverlay.clampedOffset(
+            CGSize(width: 4_000, height: -4_000),
+            panelSize: panelSize,
+            availableSize: availableSize
+        )
+        let origin = FloatingControlsOverlay.origin(
+            for: clamped,
+            panelSize: panelSize,
+            availableSize: availableSize
+        )
+
+        XCTAssertGreaterThanOrEqual(origin.x, 16)
+        XCTAssertLessThanOrEqual(origin.x + panelSize.width, availableSize.width - 16)
+        XCTAssertGreaterThanOrEqual(origin.y, 0)
+        XCTAssertLessThanOrEqual(origin.y + panelSize.height, availableSize.height - 16)
+    }
 }

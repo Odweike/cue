@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cue — macOS video player with on-device subtitles</title>
+  <meta name="description" content="Cue is a native macOS video player for MKV, MP4, and MOV. Generate time-coded subtitles on your Mac with Apple Speech, import SRT/VTT/ASS, and play locally. Free DMG for macOS 26+." />
+  <meta name="robots" content="index,follow" />
+  <meta name="keywords" content="Cue, macOS video player, MKV player Mac, on-device subtitles, Apple Speech, SRT, VTT, ASS, local transcription, macOS 26" />
+  <link rel="canonical" href="https://playrito.site/cue/" />
+  <link rel="alternate" hreflang="en" href="https://playrito.site/cue/" />
+  <link rel="alternate" hreflang="ru" href="https://playrito.site/cue/#ru" />
+  <link rel="alternate" hreflang="x-default" href="https://playrito.site/cue/" />
+  <link rel="icon" href="./icon.png?v=20260908" type="image/png" />
+  <link rel="apple-touch-icon" href="./icon.png?v=20260908" />
+  <link rel="stylesheet" href="/styles.css" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Playrito" />
+  <meta property="og:title" content="Cue — macOS video player with on-device subtitles" />
+  <meta property="og:description" content="Native Mac player for MKV and more. Subtitles generated on-device with Apple Speech. Download Cue 0.1.2 for macOS 26+." />
+  <meta property="og:url" content="https://playrito.site/cue/" />
+  <meta property="og:image" content="https://playrito.site/cue/icon.png?v=20260908" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Cue — macOS video player with on-device subtitles" />
+  <meta name="twitter:description" content="Play MKV on Mac and generate subtitles locally. Free DMG, macOS 26+." />
+  <meta name="twitter:image" content="https://playrito.site/cue/icon.png?v=20260908" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "Cue",
+        "alternateName": "Cue macOS video player",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "macOS 26 or later",
+        "softwareVersion": "0.1.2",
+        "url": "https://playrito.site/cue/",
+        "downloadUrl": "https://playrito.site/cue/downloads/Cue-0.1.2.dmg",
+        "installUrl": "https://playrito.site/cue/downloads/Cue-0.1.2.dmg",
+        "image": "https://playrito.site/cue/icon.png?v=20260908",
+        "screenshot": "https://playrito.site/cue/icon.png?v=20260908",
+        "description": "A native macOS video player that plays MKV, MP4, and MOV, and generates time-coded subtitles on-device with Apple Speech. Import SRT, VTT, and ASS tracks. Nothing is sent to a cloud recognizer.",
+        "author": {
+          "@type": "Organization",
+          "name": "Playrito",
+          "url": "https://playrito.site/"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Playrito",
+          "url": "https://playrito.site/"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "license": "https://github.com/Odweike/cue/blob/main/LICENSE",
+        "codeRepository": "https://github.com/Odweike/cue"
+      },
+      {
+        "@type": "WebPage",
+        "name": "Cue for macOS",
+        "url": "https://playrito.site/cue/",
+        "inLanguage": "en",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "Playrito",
+          "url": "https://playrito.site/"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is Cue?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Cue is a native macOS video player for local files. It plays MKV, MP4, MOV and other formats via libmpv, and can generate subtitles on your Mac with Apple Speech."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Cue send audio to the cloud?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Subtitle generation uses Apple Speech on-device. Video files stay on your Mac."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which macOS version does Cue need?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "macOS 26 or later, because Cue uses Apple’s on-device speech APIs."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How do I download Cue?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Download Cue-0.1.2.dmg from https://playrito.site/cue/, open the disk image, and drag Cue into Applications."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav container" aria-label="Main navigation">
+      <a class="brand" href="/" aria-label="Playrito home">
+        <img src="/assets/playrito-icon-20260716-512.png" width="32" height="32" alt="" />
+        <span>Playrito</span>
+      </a>
+      <div class="nav-links">
+        <a href="#download">Download</a>
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#faq">FAQ</a>
+        <a href="#ru" lang="ru" hreflang="ru">Русский</a>
+        <a href="https://github.com/Odweike/cue">GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section" id="download">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Free for macOS 26+</p>
+          <h1>macOS video player that writes subtitles on your Mac</h1>
+          <p class="lead">
+            Cue plays local MKV, MP4, and MOV files, then generates time-coded subtitles with Apple Speech.
+            Audio never leaves the machine. Import SRT, VTT, or ASS if you already have a track.
+          </p>
+          <div class="cta-row">
+            <a class="button primary" href="./downloads/Cue-0.1.2.dmg" download="Cue-0.1.2.dmg">Download Cue 0.1.2</a>
+            <a class="button secondary" href="https://github.com/Odweike/cue">Source on GitHub</a>
+          </div>
+          <ul class="store-facts">
+            <li>Cue-0.1.2.dmg · ~36 MB</li>
+            <li>macOS 26 or later</li>
+            <li>MIT · local files only</li>
+          </ul>
+          <p class="subnote">
+            Apple Silicon and Intel. Signed for local distribution, not notarized.
+            If Gatekeeper blocks the first launch, Control-click Cue in Applications and choose Open.
+          </p>
+        </div>
+        <aside class="hero-panel">
+          <img class="app-icon" src="./icon.png?v=20260908" width="128" height="128" alt="Cue app icon" />
+          <h2 style="font-size: 22px; margin-bottom: 12px;">Cue</h2>
+          <ul class="check-list">
+            <li>MKV playback with embedded and sidecar subtitles</li>
+            <li>On-device transcription with Apple Speech</li>
+            <li>Two styled overlay tracks, export to SRT</li>
+            <li>Floating controls, speed, audio delay, crop</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <section id="features" class="section alt">
+      <div class="container">
+        <div class="section-heading">
+          <h2>Built for local video, not a streaming clone</h2>
+          <p>Cue is a Mac player for files you already have — including MKV — with subtitles you can generate without uploading the movie.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>MKV, MP4, MOV</h3>
+            <p>Playback goes through an embedded LGPL build of libmpv, so common local containers and codecs open without converting first.</p>
+          </article>
+          <article class="card">
+            <h3>On-device subtitles</h3>
+            <p>Apple SpeechAnalyzer and SpeechTranscriber run on your Mac. Generate a timed track while watching, or transcribe the whole file.</p>
+          </article>
+          <article class="card">
+            <h3>Imported tracks</h3>
+            <p>Load up to two SRT, VTT, or ASS files. Embedded MKV tracks and sidecar files next to the video are picked up automatically.</p>
+          </article>
+          <article class="card">
+            <h3>Independent styles</h3>
+            <p>Each visible track has its own overlay style. Named profiles keep a look you reuse across files.</p>
+          </article>
+          <article class="card">
+            <h3>Playback tools</h3>
+            <p>Audio track picker, A/V sync, speed, hardware decode, crop, rotation, aspect, and a floating control bar that remembers layout.</p>
+          </article>
+          <article class="card">
+            <h3>Stays out of the cloud</h3>
+            <p>No account. No analytics. Files, settings, and generated subtitles stay on the Mac. Open source notices live in Help.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" class="section">
+      <div class="container narrow">
+        <h2>Install</h2>
+        <ol class="steps">
+          <li><strong>Download the disk image.</strong> Use the button above for <a href="./downloads/Cue-0.1.2.dmg" download="Cue-0.1.2.dmg">Cue-0.1.2.dmg</a>. SHA-256 checksum: <a href="./downloads/Cue-0.1.2.dmg.sha256">Cue-0.1.2.dmg.sha256</a>.</li>
+          <li><strong>Open the DMG</strong> and drag Cue into Applications.</li>
+          <li><strong>Launch from Applications.</strong> If macOS says the app cannot be opened, Control-click Cue → Open.</li>
+        </ol>
+        <p class="subnote">Requires macOS 26 or later for Apple’s on-device speech APIs.</p>
+      </div>
+    </section>
+
+    <section id="faq" class="section alt">
+      <div class="container narrow">
+        <h2>FAQ</h2>
+        <div class="faq-list">
+          <article>
+            <h3>Is Cue free?</h3>
+            <p>Yes. Cue is MIT-licensed. libmpv and related libraries keep their LGPL terms inside the app.</p>
+          </article>
+          <article>
+            <h3>Does it replace IINA?</h3>
+            <p>It is a separate player focused on local files plus on-device subtitle generation. If you only need MKV playback, other players exist; Cue exists so subtitles can be written on the Mac without a cloud service.</p>
+          </article>
+          <article>
+            <h3>Where is the source?</h3>
+            <p>Public repository: <a href="https://github.com/Odweike/cue">github.com/Odweike/cue</a>. Latest GitHub release: v0.1.2.</p>
+          </article>
+          <article>
+            <h3>Is the app notarized?</h3>
+            <p>Not yet. It is signed for development/local distribution. First launch may need Control-click → Open.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="ru" class="section" lang="ru">
+      <div class="container narrow">
+        <h2>Cue для macOS</h2>
+        <p>
+          Cue — нативный видеоплеер для Mac: открывает MKV, MP4 и MOV, подтягивает встроенные и рядом лежащие субтитры,
+          умеет импортировать SRT / VTT / ASS и <strong>генерировать таймкоды локально</strong> через Apple Speech.
+          Файл никуда не загружается.
+        </p>
+        <p>
+          Нужен macOS 26 или новее. Скачайте DMG кнопкой выше, перетащите Cue в Программы.
+          Если система не открывает приложение с первого раза — Control-клик по Cue → Открыть.
+        </p>
+        <p class="subnote">Версия 0.1.2. Исходники: GitHub Odweike/cue. Поддержка: <a href="mailto:support@playrito.site">support@playrito.site</a>.</p>
+      </div>
+    </section>
+
+    <section class="section final-cta alt">
+      <div class="container narrow">
+        <h2>Download Cue for Mac</h2>
+        <p>Disk image for macOS 26+. Same file as the GitHub release, hosted here for search and direct install.</p>
+        <a class="button primary" href="./downloads/Cue-0.1.2.dmg" download="Cue-0.1.2.dmg">Download Cue-0.1.2.dmg</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <span>© 2026 Playrito · Cue</span>
+      <nav aria-label="Footer navigation">
+        <a href="/">Playrito</a>
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+        <a href="/support.html">Support</a>
+        <a href="https://github.com/Odweike/cue">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

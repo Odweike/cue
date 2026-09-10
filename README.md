@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Odweike/cue/releases/latest"><strong>Download Cue.dmg</strong></a>
+  <a href="https://playrito.site/cue/"><strong>Download Cue.dmg</strong></a>
   ·
   <a href="#install">Install</a>
   ·
@@ -36,8 +36,8 @@ Cue plays common local video files (MKV, MP4, MOV, and more) through an embedded
 
 ## Install
 
-1. Open the [Releases](https://github.com/Odweike/cue/releases/latest) page.
-2. Download **Cue-0.1.1.dmg**.
+1. Open [playrito.site/cue](https://playrito.site/cue/) or the [GitHub release](https://github.com/Odweike/cue/releases/latest).
+2. Download **Cue-0.1.2.dmg**.
 3. Open the disk image and drag **Cue** into **Applications**.
 4. Launch Cue from Applications.
 
@@ -80,7 +80,7 @@ xcodebuild \
 Package a disk image after a successful Release build:
 
 ```sh
-./scripts/package-dmg.sh 0.1.1
+./scripts/package-dmg.sh 0.1.2
 ```
 
 ## Architecture

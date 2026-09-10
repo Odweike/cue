@@ -3,8 +3,8 @@ import ProjectDescription
 let baseSettings: [String: SettingValue] = [
     "SWIFT_VERSION": "6.0",
     "MACOSX_DEPLOYMENT_TARGET": "26.0",
-    "MARKETING_VERSION": "0.1.1",
-    "CURRENT_PROJECT_VERSION": "3",
+    "MARKETING_VERSION": "0.1.2",
+    "CURRENT_PROJECT_VERSION": "4",
     "CODE_SIGN_STYLE": "Automatic",
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
 ]
