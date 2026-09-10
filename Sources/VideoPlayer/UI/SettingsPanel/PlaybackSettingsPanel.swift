@@ -66,7 +66,18 @@ struct PlaybackSettingsPanel: View {
             Section("Playback") {
                 HStack(alignment: .center) {
                     Text("Speed")
-                    RulerSlider(value: playbackRate, range: 0.25...16, step: 0.25, majorEvery: 4)
+                    RulerSlider(
+                        value: playbackRate,
+                        range: 0.25...16,
+                        step: 0.25,
+                        logScale: true,
+                        labels: [
+                            (0.25, "0.25×"),
+                            (1, "1×"),
+                            (4, "4×"),
+                            (16, "16×")
+                        ]
+                    )
                     Text(String(format: "%.2f×", viewModel.playbackState.playbackRate))
                         .monospacedDigit()
                         .fixedSize()
@@ -122,7 +133,12 @@ struct PlaybackSettingsPanel: View {
             Section("Synchronization") {
                 HStack(alignment: .center) {
                     Text("Audio Delay")
-                    RulerSlider(value: audioDelay, range: -5...5, step: 0.1, majorEvery: 10)
+                    RulerSlider(
+                        value: audioDelay,
+                        range: -5...5,
+                        step: 0.1,
+                        labels: [(-5, "−5 s"), (0, "0"), (5, "+5 s")]
+                    )
                     Text(String(format: "%+.1f s", viewModel.playbackState.audioDelay))
                         .monospacedDigit()
                         .frame(width: 54, alignment: .trailing)

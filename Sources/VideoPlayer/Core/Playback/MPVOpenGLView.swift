@@ -92,6 +92,7 @@ final class MPVOpenGLView: NSOpenGLView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        if CueMainControlsDrag.isActive { return }
         guard let renderContext, let openGLContext else { return }
         openGLContext.makeCurrentContext()
 
@@ -129,6 +130,7 @@ private func cueMPVRenderUpdate(_ context: UnsafeMutableRawPointer?) {
     guard let context else { return }
     let view = Unmanaged<MPVOpenGLView>.fromOpaque(context).takeUnretainedValue()
     DispatchQueue.main.async {
+        if CueMainControlsDrag.isActive { return }
         view.needsDisplay = true
     }
 }

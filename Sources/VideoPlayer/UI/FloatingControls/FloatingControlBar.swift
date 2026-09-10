@@ -1,14 +1,24 @@
 import AppKit
-import Combine
 import SwiftUI
 
 struct FloatingControlBar: View {
     let viewModel: PlayerViewModel
-    private let refreshTimer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     @State private var showsSubtitles = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        TimelineView(
+            .animation(
+                paused: CueMainControlsDrag.isActive
+                    || (!viewModel.isPlaying && !viewModel.isScrubbing)
+            )
+        ) { _ in
+            controlBar
+        }
+    }
+
+    private var controlBar: some View {
+        let _ = viewModel.refreshPlaybackState()
+        return VStack(spacing: 8) {
             HStack(spacing: 12) {
                 volumeControl
                 Spacer(minLength: 8)
@@ -23,9 +33,6 @@ struct FloatingControlBar: View {
         .padding(.top, 20)
         .padding(.bottom, 14)
         .foregroundStyle(.white)
-        .onReceive(refreshTimer) { _ in
-            viewModel.refreshPlaybackState()
-        }
     }
 
     private var volumeControl: some View {
@@ -231,14 +238,7 @@ struct FloatingControlsOverlay: View {
             )
             .scaleEffect(controlsScale)
             .frame(width: panelSize.width, height: panelSize.height)
-            .background {
-                let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-                shape
-                    .fill(.regularMaterial)
-                    .overlay {
-                        shape.fill(.black.opacity(0.22))
-                    }
-            }
+            .background(.clear)
             .overlay(alignment: .bottomTrailing) {
                 resizeHandle(in: availableSize)
             }
@@ -379,14 +379,20 @@ private struct FloatingPanelCanvas<Content: View>: NSViewRepresentable {
         view.onMoveEnded = onMoveEnded
         view.panelSize = panelSize
         view.storedOffset = offset
-        view.hostingView.rootView = AnyView(content)
         if !view.isMoving {
+            view.hostingView.rootView = AnyView(content)
             view.needsLayout = true
         }
     }
 }
 
+enum CueMainControlsDrag {
+    nonisolated(unsafe) static var isActive = false
+}
+
 private final class FloatingPanelCanvasView: NSView {
+    let panelView = NSView()
+    let effectView = NSVisualEffectView()
     let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
     private let moveHandle = MoveHandleView()
     var panelSize: CGSize = .zero
@@ -398,12 +404,28 @@ private final class FloatingPanelCanvasView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        hostingView.wantsLayer = true
-        addSubview(hostingView)
+        panelView.wantsLayer = true
+        panelView.layer?.cornerRadius = 18
+        panelView.layer?.cornerCurve = .continuous
+        panelView.layer?.masksToBounds = true
+
+        effectView.material = .hudWindow
+        effectView.blendingMode = .withinWindow
+        effectView.state = .active
+        effectView.appearance = NSAppearance(named: .darkAqua)
+        effectView.autoresizingMask = [.width, .height]
+
+        hostingView.autoresizingMask = [.width, .height]
+        hostingView.safeAreaRegions = []
+
+        addSubview(panelView)
+        panelView.addSubview(effectView)
+        panelView.addSubview(hostingView)
         moveHandle.canvas = self
         moveHandle.setAccessibilityLabel("Move controls")
         moveHandle.toolTip = "Drag to move"
-        addSubview(moveHandle)
+        moveHandle.autoresizingMask = [.width]
+        panelView.addSubview(moveHandle)
     }
 
     @available(*, unavailable)
@@ -420,28 +442,25 @@ private final class FloatingPanelCanvasView: NSView {
 
     override func layout() {
         super.layout()
-        if !isMoving {
-            applyFrame(
-                origin: FloatingControlsOverlay.origin(
-                    for: storedOffset,
-                    panelSize: panelSize,
-                    availableSize: bounds.size
-                ),
-                size: panelSize
-            )
-        }
-        moveHandle.frame = CGRect(
-            x: hostingView.frame.minX,
-            y: hostingView.frame.minY,
-            width: hostingView.frame.width,
-            height: 20
+        guard !isMoving else { return }
+        panelView.frame = CGRect(
+            origin: FloatingControlsOverlay.origin(
+                for: storedOffset,
+                panelSize: panelSize,
+                availableSize: bounds.size
+            ),
+            size: panelSize
         )
+        effectView.frame = panelView.bounds
+        hostingView.frame = panelView.bounds
+        moveHandle.frame = CGRect(x: 0, y: 0, width: panelSize.width, height: 20)
     }
 
     func beginMove(with event: NSEvent) {
+        CueMainControlsDrag.isActive = true
         isMoving = true
         moveStartMouse = convert(event.locationInWindow, from: nil)
-        moveStartOrigin = hostingView.frame.origin
+        moveStartOrigin = panelView.frame.origin
     }
 
     func continueMove(with event: NSEvent) {
@@ -450,47 +469,38 @@ private final class FloatingPanelCanvasView: NSView {
             x: moveStartOrigin.x + mouse.x - moveStartMouse.x,
             y: moveStartOrigin.y + mouse.y - moveStartMouse.y
         )
+        let size = panelView.frame.size
         let offset = FloatingControlsOverlay.clampedOffset(
             FloatingControlsOverlay.offset(
                 from: proposed,
-                panelSize: hostingView.frame.size,
+                panelSize: size,
                 availableSize: bounds.size
             ),
-            panelSize: hostingView.frame.size,
+            panelSize: size,
             availableSize: bounds.size
         )
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        applyFrame(
-            origin: FloatingControlsOverlay.origin(
+        panelView.setFrameOrigin(
+            FloatingControlsOverlay.origin(
                 for: offset,
-                panelSize: hostingView.frame.size,
+                panelSize: size,
                 availableSize: bounds.size
-            ),
-            size: hostingView.frame.size
-        )
-        moveHandle.frame = CGRect(
-            x: hostingView.frame.minX,
-            y: hostingView.frame.minY,
-            width: hostingView.frame.width,
-            height: 20
+            )
         )
         CATransaction.commit()
     }
 
     func endMove() {
         isMoving = false
+        CueMainControlsDrag.isActive = false
         onMoveEnded?(
             FloatingControlsOverlay.offset(
-                from: hostingView.frame.origin,
-                panelSize: hostingView.frame.size,
+                from: panelView.frame.origin,
+                panelSize: panelView.frame.size,
                 availableSize: bounds.size
             )
         )
-    }
-
-    private func applyFrame(origin: CGPoint, size: CGSize) {
-        hostingView.frame = CGRect(origin: origin, size: size)
     }
 }
 
