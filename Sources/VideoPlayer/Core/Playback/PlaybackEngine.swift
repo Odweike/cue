@@ -68,8 +68,14 @@ struct PlaybackState: Equatable, Sendable {
     }
 }
 
+enum PlaybackEngineEvent: Sendable {
+    case fileReady
+    case failedToOpen(String)
+}
+
 @MainActor
 protocol PlaybackEngine: AnyObject {
+    var eventHandler: ((PlaybackEngineEvent) -> Void)? { get set }
     var renderView: NSView { get }
     var currentURL: URL? { get }
     var state: PlaybackState { get }

@@ -3,6 +3,7 @@ import Libmpv
 
 @MainActor
 final class MPVPlaybackEngine: PlaybackEngine {
+    var eventHandler: ((PlaybackEngineEvent) -> Void)?
     private let playerView = MPVOpenGLView(frame: .zero)
     nonisolated(unsafe) private let context: OpaquePointer
     private let eventDrainer: MPVEventDrainer
@@ -65,14 +66,31 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setOption("sub-visibility", to: "no")
 
         let status = mpv_initialize(context)
-        precondition(status >= 0, "Could not initialize mpv: \(Self.errorMessage(for: status))")
+        precondition(status >= 0, "Could not initialize mpv: \(MPV.errorMessage(for: status))")
         playerView.attach(to: context)
+
+        eventDrainer.eventSink = { [weak self] event in
+            DispatchQueue.main.async {
+                self?.handleDrainerEvent(event)
+            }
+        }
 
         mpv_set_wakeup_callback(
             context,
             cueMPVWakeup,
             Unmanaged.passUnretained(eventDrainer).toOpaque()
         )
+    }
+
+    private func handleDrainerEvent(_ event: MPVDrainerEvent) {
+        switch event {
+        case .fileReady:
+            eventHandler?(.fileReady)
+        case .endFile(let error) where error < 0:
+            eventHandler?(.failedToOpen(MPV.errorMessage(for: error)))
+        case .endFile:
+            break
+        }
     }
 
     deinit {
@@ -203,16 +221,13 @@ final class MPVPlaybackEngine: PlaybackEngine {
     }
 
     private func command(_ values: String...) {
-        var arguments = values.map { UnsafePointer<CChar>(strdup($0)) }
-        arguments.append(nil)
-        defer { arguments.compactMap { $0 }.forEach { free(UnsafeMutablePointer(mutating: $0)) } }
-        mpv_command(context, &arguments)
+        MPV.command(values, on: context)
     }
 
     private func setOption(_ name: String, to value: String) {
-        let status = mpv_set_option_string(context, name, value)
+        let status = MPV.setOption(name, to: value, on: context)
         if status < 0 {
-            assertionFailure("mpv option \(name) failed: \(Self.errorMessage(for: status))")
+            assertionFailure("mpv option \(name) failed: \(MPV.errorMessage(for: status))")
         }
     }
 
@@ -262,16 +277,17 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private func nonnegative(_ value: Double) -> TimeInterval {
         value.isFinite ? max(value, 0) : 0
     }
+}
 
-    private static func errorMessage(for status: Int32) -> String {
-        guard let message = mpv_error_string(status) else { return "unknown error \(status)" }
-        return String(cString: message)
-    }
+private enum MPVDrainerEvent: Sendable {
+    case fileReady
+    case endFile(error: Int32)
 }
 
 private final class MPVEventDrainer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "dev.maxim.cue.mpv-events")
     private var context: OpaquePointer?
+    var eventSink: (@Sendable (MPVDrainerEvent) -> Void)?
 
     init(context: OpaquePointer) {
         self.context = context
@@ -279,14 +295,31 @@ private final class MPVEventDrainer: @unchecked Sendable {
 
     func wakeUp() {
         queue.async { [self] in
-            while let context,
-                  mpv_wait_event(context, 0).pointee.event_id != MPV_EVENT_NONE {}
+            while let context {
+                let event = mpv_wait_event(context, 0).pointee
+                if event.event_id == MPV_EVENT_NONE { break }
+                handle(event)
+            }
         }
     }
 
     func invalidate() {
         queue.sync {
             context = nil
+        }
+    }
+
+    private func handle(_ event: mpv_event) {
+        switch event.event_id {
+        case MPV_EVENT_FILE_LOADED:
+            eventSink?(.fileReady)
+        case MPV_EVENT_END_FILE:
+            let error = event.data?
+                .assumingMemoryBound(to: mpv_event_end_file.self)
+                .pointee.error ?? 0
+            eventSink?(.endFile(error: error))
+        default:
+            break
         }
     }
 }

@@ -1,6 +1,7 @@
 import XCTest
 @testable import VideoPlayer
 
+@MainActor
 final class WatchHistoryStoreTests: XCTestCase {
     func testUnfinishedItemsAreRememberedAndFinishedOnesDropOut() throws {
         let fileURL = FileManager.default.temporaryDirectory

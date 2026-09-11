@@ -10,14 +10,16 @@ struct FloatingControlBar: View {
             .animation(
                 paused: !viewModel.isPlaying && !viewModel.isScrubbing
             )
-        ) { _ in
+        ) { context in
             controlBar
+                .onChange(of: context.date) { _, _ in
+                    viewModel.refreshPlaybackState()
+                }
         }
     }
 
     private var controlBar: some View {
-        let _ = viewModel.refreshPlaybackState()
-        return VStack(spacing: 8) {
+        VStack(spacing: 8) {
             HStack(spacing: 12) {
                 volumeControl
                 Spacer(minLength: 8)

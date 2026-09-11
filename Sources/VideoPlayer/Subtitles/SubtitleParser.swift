@@ -3,12 +3,44 @@ import Foundation
 enum SubtitleParserError: LocalizedError {
     case unsupportedFormat
     case noCues
+    case unreadableFile
 
     var errorDescription: String? {
         switch self {
         case .unsupportedFormat: "Unsupported subtitle format. Use SRT, VTT, or ASS."
         case .noCues: "No readable subtitle cues were found."
+        case .unreadableFile: "Couldn't read the subtitle file. Make sure it's a text file."
         }
+    }
+}
+
+enum SubtitleTextDecoder {
+    /// Reads a subtitle file as text. Subtitle files arrive in many legacy
+    /// encodings, so UTF-8 is tried first, then common 8-bit code pages.
+    /// Windows-1251 is preferred over 1252 when the result contains Cyrillic.
+    static func string(from url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return decode(data)
+    }
+
+    static func decode(_ data: Data) -> String? {
+        if let utf8 = String(data: data, encoding: .utf8) {
+            return utf8
+        }
+        if let cyrillic = String(data: data, encoding: .windowsCP1251),
+           cyrillic.contains(where: { $0.isCyrillic }) {
+            return cyrillic
+        }
+        if let western = String(data: data, encoding: .windowsCP1252) {
+            return western
+        }
+        return String(data: data, encoding: .windowsCP1251)
+    }
+}
+
+private extension Character {
+    var isCyrillic: Bool {
+        unicodeScalars.contains { (0x0400...0x04FF).contains($0.value) }
     }
 }
 
@@ -111,8 +143,15 @@ enum SubtitleParser {
             .first?
             .replacingOccurrences(of: ",", with: ".") ?? ""
         let components = value.split(separator: ":").compactMap { Double($0) }
-        guard components.count == 3 else { return nil }
-        return components[0] * 3_600 + components[1] * 60 + components[2]
+        // WebVTT allows both "hh:mm:ss.ttt" and the short "mm:ss.ttt" form.
+        switch components.count {
+        case 3:
+            return components[0] * 3_600 + components[1] * 60 + components[2]
+        case 2:
+            return components[0] * 60 + components[1]
+        default:
+            return nil
+        }
     }
 
     private static func normalizedLines(_ contents: String) -> [String] {

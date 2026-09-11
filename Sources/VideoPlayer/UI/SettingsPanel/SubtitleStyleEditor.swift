@@ -105,13 +105,13 @@ struct SubtitleStyleEditor: View {
             }
 
             Section("Text") {
-                Picker("Font", selection: fontDesign) {
+                Picker("Font", selection: styleBinding(\.fontDesign)) {
                     ForEach(SubtitleFontDesign.allCases) { option in
                         Text(option.title).tag(option)
                     }
                 }
 
-                Picker("Weight", selection: fontWeight) {
+                Picker("Weight", selection: styleBinding(\.fontWeight)) {
                     ForEach(SubtitleFontWeight.allCases) { option in
                         Text(option.title).tag(option)
                     }
@@ -119,27 +119,27 @@ struct SubtitleStyleEditor: View {
 
                 LabeledContent("Size") {
                     HStack {
-                        Slider(value: fontSize, in: 14...52)
-                        Text("\(Int(style.wrappedValue.fontSize)) pt")
+                        Slider(value: styleBinding(\.fontSize), in: 14...52)
+                        Text("\(Int(style.fontSize)) pt")
                             .monospacedDigit()
                             .frame(width: 48, alignment: .trailing)
                     }
                 }
 
-                Picker("Color", selection: textColor) {
+                Picker("Color", selection: styleBinding(\.textColor)) {
                     colorOptions()
                 }
             }
 
             Section("Outline") {
-                Picker("Color", selection: outlineColor) {
+                Picker("Color", selection: styleBinding(\.outlineColor)) {
                     colorOptions()
                 }
 
                 LabeledContent("Width") {
                     HStack {
-                        Slider(value: outlineWidth, in: 0...4)
-                        Text(String(format: "%.1f", style.wrappedValue.outlineWidth))
+                        Slider(value: styleBinding(\.outlineWidth), in: 0...4)
+                        Text(String(format: "%.1f", style.outlineWidth))
                             .monospacedDigit()
                             .frame(width: 28, alignment: .trailing)
                     }
@@ -147,24 +147,24 @@ struct SubtitleStyleEditor: View {
             }
 
             Section("Background") {
-                Picker("Color", selection: backgroundColor) {
+                Picker("Color", selection: styleBinding(\.backgroundColor)) {
                     colorOptions()
                 }
 
                 LabeledContent("Opacity") {
-                    Slider(value: backgroundOpacity, in: 0...0.9)
+                    Slider(value: styleBinding(\.backgroundOpacity), in: 0...0.9)
                 }
             }
 
             Section("Placement") {
-                Picker("Position", selection: position) {
+                Picker("Position", selection: styleBinding(\.position)) {
                     ForEach(SubtitlePosition.allCases) { option in
                         Text(option.title).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)
 
-                Picker("Alignment", selection: alignment) {
+                Picker("Alignment", selection: styleBinding(\.alignment)) {
                     ForEach(SubtitleAlignment.allCases) { option in
                         HStack {
                             Image(systemName: alignmentIcon(option))
@@ -175,9 +175,9 @@ struct SubtitleStyleEditor: View {
                 }
                 .pickerStyle(.segmented)
 
-                if style.wrappedValue.position == .custom {
+                if style.position == .custom {
                     LabeledContent("Height") {
-                        Slider(value: verticalOffset, in: 20...360)
+                        Slider(value: styleBinding(\.verticalOffset), in: 20...360)
                     }
                 }
             }
@@ -248,87 +248,18 @@ struct SubtitleStyleEditor: View {
         }
     }
 
-    private var style: Binding<SubtitleStyle> {
-        Binding(
-            get: { viewModel.subtitleStyles[selectedTrack] },
-            set: { viewModel.setSubtitleStyle($0, at: selectedTrack) }
-        )
+    private var style: SubtitleStyle {
+        viewModel.subtitleStyles[selectedTrack]
     }
 
-    private var fontSize: Binding<Double> {
+    private func styleBinding<T>(_ keyPath: WritableKeyPath<SubtitleStyle, T>) -> Binding<T> {
         Binding(
-            get: { style.wrappedValue.fontSize },
-            set: { style.wrappedValue.fontSize = $0 }
-        )
-    }
-
-    private var fontDesign: Binding<SubtitleFontDesign> {
-        Binding(
-            get: { style.wrappedValue.fontDesign },
-            set: { style.wrappedValue.fontDesign = $0 }
-        )
-    }
-
-    private var fontWeight: Binding<SubtitleFontWeight> {
-        Binding(
-            get: { style.wrappedValue.fontWeight },
-            set: { style.wrappedValue.fontWeight = $0 }
-        )
-    }
-
-    private var textColor: Binding<SubtitleColor> {
-        Binding(
-            get: { style.wrappedValue.textColor },
-            set: { style.wrappedValue.textColor = $0 }
-        )
-    }
-
-    private var outlineColor: Binding<SubtitleColor> {
-        Binding(
-            get: { style.wrappedValue.outlineColor },
-            set: { style.wrappedValue.outlineColor = $0 }
-        )
-    }
-
-    private var outlineWidth: Binding<Double> {
-        Binding(
-            get: { style.wrappedValue.outlineWidth },
-            set: { style.wrappedValue.outlineWidth = $0 }
-        )
-    }
-
-    private var backgroundColor: Binding<SubtitleColor> {
-        Binding(
-            get: { style.wrappedValue.backgroundColor },
-            set: { style.wrappedValue.backgroundColor = $0 }
-        )
-    }
-
-    private var backgroundOpacity: Binding<Double> {
-        Binding(
-            get: { style.wrappedValue.backgroundOpacity },
-            set: { style.wrappedValue.backgroundOpacity = $0 }
-        )
-    }
-
-    private var position: Binding<SubtitlePosition> {
-        Binding(
-            get: { style.wrappedValue.position },
-            set: { style.wrappedValue.position = $0 }
-        )
-    }
-
-    private var verticalOffset: Binding<Double> {
-        Binding(
-            get: { style.wrappedValue.verticalOffset },
-            set: { style.wrappedValue.verticalOffset = $0 }
-        )
-    }
-
-    private var alignment: Binding<SubtitleAlignment> {
-        Binding(
-            get: { style.wrappedValue.alignment },
-            set: { style.wrappedValue.alignment = $0 }
+            get: { viewModel.subtitleStyles[selectedTrack][keyPath: keyPath] },
+            set: { value in
+                var style = viewModel.subtitleStyles[selectedTrack]
+                style[keyPath: keyPath] = value
+                viewModel.setSubtitleStyle(style, at: selectedTrack)
+            }
         )
     }
 

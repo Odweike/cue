@@ -85,7 +85,7 @@ Package a disk image after a successful Release build:
 
 ## Architecture
 
-Playback is isolated behind `PlaybackEngine` (libmpv in the shipping app, AVFoundation kept as a fallback). Recognition is isolated behind `TranscriptionEngine`, implemented with `SpeechAnalyzer` / `SpeechTranscriber`. See [SPECIFICATION.md](SPECIFICATION.md) for the original design notes.
+Playback is isolated behind `PlaybackEngine`, implemented with libmpv (MPVKit). Recognition is isolated behind `TranscriptionEngine`, implemented with `SpeechAnalyzer` / `SpeechTranscriber`. See [SPECIFICATION.md](SPECIFICATION.md) for the original design notes.
 
 ## License
 

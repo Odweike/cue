@@ -44,6 +44,42 @@ final class SubtitleParserTests: XCTestCase {
         XCTAssertEqual(cue.text, "Hello")
     }
 
+    func testParsesVTTShortTimestampsWithoutHours() throws {
+        let vtt = """
+        WEBVTT
+
+        00:04.000 --> 00:06.500
+        Short form
+        """
+        let cue = try XCTUnwrap(SubtitleParser.parse(vtt, fileExtension: "vtt", trackID: UUID()).first)
+        XCTAssertEqual(cue.startTime, 4)
+        XCTAssertEqual(cue.endTime, 6.5)
+        XCTAssertEqual(cue.text, "Short form")
+    }
+
+    func testParsesWindows1251EncodedSRT() throws {
+        let srt = "1\n00:00:01,000 --> 00:00:02,000\nПривет, мир\n"
+        let data = try XCTUnwrap(srt.data(using: .windowsCP1251))
+        let decoded = try XCTUnwrap(SubtitleTextDecoder.decode(data))
+        let cue = try XCTUnwrap(SubtitleParser.parse(decoded, fileExtension: "srt", trackID: UUID()).first)
+        XCTAssertEqual(cue.text, "Привет, мир")
+    }
+
+    func testSubtitleStyleNormalizationClampsValues() {
+        let style = SubtitleStyle(
+            fontSize: 500,
+            textColor: .white,
+            outlineWidth: 99,
+            backgroundOpacity: 2,
+            verticalOffset: -50
+        )
+        let normalized = style.normalized()
+        XCTAssertEqual(normalized.fontSize, 52)
+        XCTAssertEqual(normalized.outlineWidth, 4)
+        XCTAssertEqual(normalized.backgroundOpacity, 0.9)
+        XCTAssertEqual(normalized.verticalOffset, 20)
+    }
+
     func testWritesSRTWithMillisecondTimestamps() {
         let trackID = UUID()
         let contents = SubtitleFileWriter.srtContents(for: [

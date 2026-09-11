@@ -103,7 +103,7 @@ struct SubtitleExtractor: Sendable {
 
         let initializationStatus = mpv_initialize(context)
         guard initializationStatus >= 0 else {
-            throw SubtitleExtractionError.failed(errorMessage(for: initializationStatus))
+            throw SubtitleExtractionError.failed(MPV.errorMessage(for: initializationStatus))
         }
 
         try command(["loadfile", sourceURL.path(percentEncoded: false), "replace"], on: context)
@@ -114,7 +114,7 @@ struct SubtitleExtractor: Sendable {
             case MPV_EVENT_END_FILE:
                 if let data = event.data?.assumingMemoryBound(to: mpv_event_end_file.self),
                    data.pointee.error < 0 {
-                    throw SubtitleExtractionError.failed(errorMessage(for: data.pointee.error))
+                    throw SubtitleExtractionError.failed(MPV.errorMessage(for: data.pointee.error))
                 }
                 break extractionLoop
             case MPV_EVENT_SHUTDOWN:
@@ -139,24 +139,16 @@ struct SubtitleExtractor: Sendable {
         to value: String,
         on context: OpaquePointer
     ) throws {
-        let status = mpv_set_option_string(context, name, value)
+        let status = MPV.setOption(name, to: value, on: context)
         guard status >= 0 else {
-            throw SubtitleExtractionError.failed("\(name): \(errorMessage(for: status))")
+            throw SubtitleExtractionError.failed("\(name): \(MPV.errorMessage(for: status))")
         }
     }
 
     private static func command(_ values: [String], on context: OpaquePointer) throws {
-        var arguments = values.map { UnsafePointer<CChar>(strdup($0)) }
-        arguments.append(nil)
-        defer { arguments.compactMap { $0 }.forEach { free(UnsafeMutablePointer(mutating: $0)) } }
-        let status = mpv_command(context, &arguments)
+        let status = MPV.command(values, on: context)
         guard status >= 0 else {
-            throw SubtitleExtractionError.failed(errorMessage(for: status))
+            throw SubtitleExtractionError.failed(MPV.errorMessage(for: status))
         }
-    }
-
-    private static func errorMessage(for status: Int32) -> String {
-        guard let message = mpv_error_string(status) else { return "unknown error \(status)" }
-        return String(cString: message)
     }
 }

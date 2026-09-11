@@ -9,7 +9,8 @@ struct WatchHistoryItem: Codable, Identifiable, Equatable, Sendable {
     var updatedAt: Date
 }
 
-final class WatchHistoryStore: @unchecked Sendable {
+@MainActor
+final class WatchHistoryStore {
     static let live = WatchHistoryStore(fileURL: defaultFileURL())
     static func ephemeral() -> WatchHistoryStore {
         WatchHistoryStore(fileURL: nil)

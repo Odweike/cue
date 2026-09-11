@@ -67,6 +67,14 @@ struct PlayerRootView: View {
         .background {
             SpacePlaybackCatcher(viewModel: viewModel)
         }
+        .alert("Playback Error", isPresented: Binding(
+            get: { viewModel.playbackError != nil },
+            set: { if !$0 { viewModel.dismissPlaybackError() } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.playbackError ?? "Unknown error")
+        }
         .navigationTitle(viewModel.currentURL?.lastPathComponent ?? "Cue")
     }
 }

@@ -195,6 +195,36 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(restored.subtitleStyleProfiles.first?.styles, [first, second])
     }
 
+    func testFileReadyResumesPendingPosition() {
+        let engine = PlaybackEngineSpy()
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+
+        viewModel.open(URL(fileURLWithPath: "/tmp/example.mp4"), resumingAt: 42)
+        engine.state.duration = 100
+        engine.eventHandler?(.fileReady)
+
+        XCTAssertEqual(engine.seekTime, 42)
+        XCTAssertEqual(engine.seekExact, true)
+    }
+
+    func testFailedToOpenReturnsToWelcomeWithError() {
+        let engine = PlaybackEngineSpy()
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        let url = URL(fileURLWithPath: "/tmp/broken.mp4").resolvingSymlinksInPath().standardizedFileURL
+
+        viewModel.open(url)
+        XCTAssertEqual(viewModel.currentURL, url)
+
+        engine.eventHandler?(.failedToOpen("boom"))
+
+        XCTAssertNil(viewModel.currentURL)
+        XCTAssertEqual(viewModel.playbackError, "boom")
+        XCTAssertTrue(viewModel.continueWatching.isEmpty)
+
+        viewModel.dismissPlaybackError()
+        XCTAssertNil(viewModel.playbackError)
+    }
+
     func testProgressiveTranscriptionAddsCuesAsTheyArrive() async {
         let viewModel = PlayerViewModel(
             playbackEngine: PlaybackEngineSpy(),
@@ -277,6 +307,7 @@ private struct TranscriptionEngineStub: TranscriptionEngine {
 @MainActor
 private final class PlaybackEngineSpy: PlaybackEngine {
     let renderView = NSView()
+    var eventHandler: ((PlaybackEngineEvent) -> Void)?
     private(set) var currentURL: URL?
     private(set) var openCount = 0
     var state = PlaybackState()

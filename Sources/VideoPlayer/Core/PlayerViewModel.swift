@@ -20,11 +20,14 @@ final class PlayerViewModel {
     private var accessedFileURL: URL?
     private var mediaLoadID = UUID()
     private var subtitleLoadTask: Task<Void, Never>?
+    private var embeddedSubtitleTasks: [Task<Void, Never>] = []
+    private var embeddedSubtitlesLoadedID: UUID?
+    private var pendingResumePosition: TimeInterval?
     private let watchHistory: WatchHistoryStore
     private var lastHistorySave = Date.distantPast
     private var lastScrubSeek = Date.distantPast
-    private var resumeTask: Task<Void, Never>?
     private(set) var currentURL: URL?
+    private(set) var playbackError: String?
     private(set) var currentTime: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
     private(set) var isPlaying = false
@@ -61,6 +64,10 @@ final class PlayerViewModel {
             forKey: Self.transcriptionLocaleKey
         ) ?? Locale.current.identifier
         continueWatching = watchHistory.unfinished()
+
+        self.playbackEngine.eventHandler = { [weak self] event in
+            self?.handleEngineEvent(event)
+        }
     }
 
     func open(_ url: URL, resumingAt position: TimeInterval? = nil) {
@@ -73,25 +80,66 @@ final class PlayerViewModel {
             return
         }
 
-        accessedFileURL?.stopAccessingSecurityScopedResource()
+        teardownCurrentFile()
         accessedFileURL = fileURL.startAccessingSecurityScopedResource() ? fileURL : nil
 
-        cancelTranscription()
-        setProgressiveTranscriptionEnabled(false)
-        subtitleLoadTask?.cancel()
-        resumeTask?.cancel()
-        subtitleTracks.removeAll()
-        audioTracks.removeAll()
-        isScrubbing = false
         playbackEngine.open(fileURL)
         playbackEngine.play()
         currentURL = fileURL
+        if let position, position > 1 {
+            pendingResumePosition = position
+        }
         refreshPlaybackState()
         refreshAudioTracks()
         startSubtitleLoad(for: fileURL)
-        if let position, position > 1 {
-            resume(at: position)
+        persistWatchProgress(force: true)
+    }
+
+    private func teardownCurrentFile() {
+        cancelTranscription()
+        setProgressiveTranscriptionEnabled(false)
+        subtitleLoadTask?.cancel()
+        subtitleLoadTask = nil
+        embeddedSubtitleTasks.forEach { $0.cancel() }
+        embeddedSubtitleTasks.removeAll()
+        embeddedSubtitlesLoadedID = nil
+        pendingResumePosition = nil
+        subtitleTracks.removeAll()
+        audioTracks.removeAll()
+        isScrubbing = false
+        mediaLoadID = UUID()
+        accessedFileURL?.stopAccessingSecurityScopedResource()
+        accessedFileURL = nil
+    }
+
+    private func handleEngineEvent(_ event: PlaybackEngineEvent) {
+        guard playbackEngine.currentURL == currentURL else { return }
+        switch event {
+        case .fileReady:
+            refreshPlaybackState()
+            refreshAudioTracks()
+            resumePendingPositionIfNeeded()
+            loadEmbeddedSubtitleStreams()
+        case .failedToOpen(let message):
+            if let failedURL = currentURL {
+                watchHistory.remove(failedURL.path)
+            }
+            teardownCurrentFile()
+            currentURL = nil
+            refreshPlaybackState()
+            continueWatching = watchHistory.unfinished()
+            playbackError = message
         }
+    }
+
+    func dismissPlaybackError() {
+        playbackError = nil
+    }
+
+    private func resumePendingPositionIfNeeded() {
+        guard let position = pendingResumePosition else { return }
+        pendingResumePosition = nil
+        seek(to: duration > 1 ? min(position, duration - 1) : position)
         persistWatchProgress(force: true)
     }
 
@@ -100,30 +148,12 @@ final class PlayerViewModel {
             forgetWatchHistory(item.id)
             return
         }
-        _ = url.startAccessingSecurityScopedResource()
         open(url, resumingAt: item.position)
     }
 
     func forgetWatchHistory(_ id: String) {
         watchHistory.remove(id)
         continueWatching = watchHistory.unfinished()
-    }
-
-    private func resume(at position: TimeInterval) {
-        resumeTask?.cancel()
-        resumeTask = Task { @MainActor [weak self] in
-            for _ in 0..<40 {
-                try? await Task.sleep(for: .milliseconds(50))
-                guard let self, !Task.isCancelled else { return }
-                if duration > 0 {
-                    seek(to: min(position, max(duration - 1, 0)))
-                    persistWatchProgress(force: true)
-                    return
-                }
-            }
-            guard let self, !Task.isCancelled else { return }
-            seek(to: position)
-        }
     }
 
     func persistWatchProgress(force: Bool = false) {
@@ -275,9 +305,12 @@ final class PlayerViewModel {
     }
 
     func importSubtitles(_ url: URL) throws {
+        guard let contents = SubtitleTextDecoder.string(from: url) else {
+            throw SubtitleParserError.unreadableFile
+        }
         try appendSubtitleTrack(
             name: url.lastPathComponent,
-            contents: String(contentsOf: url, encoding: .utf8),
+            contents: contents,
             fileExtension: url.pathExtension,
             autoEnable: true
         )
@@ -545,45 +578,47 @@ final class PlayerViewModel {
     }
 
     private func startSubtitleLoad(for fileURL: URL) {
-        let loadID = UUID()
-        mediaLoadID = loadID
+        let loadID = mediaLoadID
         subtitleLoadTask = Task { [weak self] in
-            await self?.loadSubtitleSources(for: fileURL, loadID: loadID)
+            for url in SidecarSubtitleLocator.urls(beside: fileURL) {
+                guard let self, !Task.isCancelled, self.mediaLoadID == loadID else { return }
+                guard let contents = SubtitleTextDecoder.string(from: url) else { continue }
+                try? appendSubtitleTrack(
+                    name: url.lastPathComponent,
+                    contents: contents,
+                    fileExtension: url.pathExtension,
+                    autoEnable: true
+                )
+            }
         }
     }
 
-    private func loadSubtitleSources(for fileURL: URL, loadID: UUID) async {
-        for url in SidecarSubtitleLocator.urls(beside: fileURL) {
-            guard !Task.isCancelled, mediaLoadID == loadID else { return }
-            try? appendSubtitleTrack(
-                name: url.lastPathComponent,
-                contents: String(contentsOf: url, encoding: .utf8),
-                fileExtension: url.pathExtension,
-                autoEnable: true
-            )
-        }
+    private func loadEmbeddedSubtitleStreams() {
+        guard let fileURL = currentURL, embeddedSubtitlesLoadedID != mediaLoadID else { return }
+        let streams = playbackEngine.subtitleStreams().filter(\.isTextCodec)
+        guard !streams.isEmpty else { return }
 
-        var streams: [SubtitleStream] = []
-        for _ in 0..<40 {
-            guard !Task.isCancelled, mediaLoadID == loadID else { return }
-            streams = playbackEngine.subtitleStreams().filter(\.isTextCodec)
-            if !streams.isEmpty { break }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
+        let loadID = mediaLoadID
+        let sidecarTask = subtitleLoadTask
+        embeddedSubtitlesLoadedID = loadID
 
         for stream in streams {
-            guard !Task.isCancelled, mediaLoadID == loadID else { return }
-            do {
-                let contents = try await subtitleExtractor.extract(from: fileURL, stream: stream)
-                try appendSubtitleTrack(
-                    name: stream.displayName,
-                    contents: contents,
-                    fileExtension: stream.fileExtension,
-                    autoEnable: shouldAutoEnable(stream)
-                )
-            } catch {
-                continue
+            let task = Task { [weak self, subtitleExtractor] in
+                await sidecarTask?.value
+                do {
+                    let contents = try await subtitleExtractor.extract(from: fileURL, stream: stream)
+                    guard let self, !Task.isCancelled, self.mediaLoadID == loadID else { return }
+                    try appendSubtitleTrack(
+                        name: stream.displayName,
+                        contents: contents,
+                        fileExtension: stream.fileExtension,
+                        autoEnable: shouldAutoEnable(stream)
+                    )
+                } catch {
+                    return
+                }
             }
+            embeddedSubtitleTasks.append(task)
         }
     }
 
