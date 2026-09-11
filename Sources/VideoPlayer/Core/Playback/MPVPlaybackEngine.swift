@@ -19,13 +19,12 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
     var state: PlaybackState {
-        let isPaused = boolProperty("pause", fallback: true)
-        let isIdle = boolProperty("core-idle", fallback: true)
+        let isPaused = boolProperty("pause")
 
         return PlaybackState(
             currentTime: nonnegative(doubleProperty("time-pos")),
             duration: nonnegative(doubleProperty("duration")),
-            isPlaying: !isPaused && !isIdle,
+            isPlaying: !isPaused,
             volume: Float(doubleProperty("volume", fallback: 100) / 100),
             isMuted: boolProperty("mute"),
             playbackRate: playbackRate,
@@ -85,6 +84,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
     func open(_ url: URL) {
         currentURL = url
         command("loadfile", url.path(percentEncoded: false), "replace")
+        play()
     }
 
     func play() {

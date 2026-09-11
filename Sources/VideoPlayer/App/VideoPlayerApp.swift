@@ -3,11 +3,19 @@ import SwiftUI
 
 @MainActor
 final class CueAppDelegate: NSObject, NSApplicationDelegate {
-    let viewModel = PlayerViewModel(playbackEngine: MPVPlaybackEngine())
+    let viewModel = PlayerViewModel(playbackEngine: MPVPlaybackEngine(), watchHistory: .live)
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first(where: VideoFilePicker.canOpen) else { return }
         viewModel.open(url)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        viewModel.persistWatchProgress(force: true)
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        viewModel.persistWatchProgress(force: true)
     }
 }
 

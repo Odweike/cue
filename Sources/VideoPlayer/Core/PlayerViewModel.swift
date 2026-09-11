@@ -20,7 +20,10 @@ final class PlayerViewModel {
     private var accessedFileURL: URL?
     private var mediaLoadID = UUID()
     private var subtitleLoadTask: Task<Void, Never>?
+    private let watchHistory: WatchHistoryStore
+    private var lastHistorySave = Date.distantPast
     private var lastScrubSeek = Date.distantPast
+    private var resumeTask: Task<Void, Never>?
     private(set) var currentURL: URL?
     private(set) var currentTime: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
@@ -40,25 +43,35 @@ final class PlayerViewModel {
     private(set) var isSettingsPresented = false
     private(set) var isScrubbing = false
     private(set) var scrubTime: TimeInterval = 0
+    private(set) var continueWatching: [WatchHistoryItem] = []
 
     init(
         playbackEngine: any PlaybackEngine,
         transcriptionEngine: any TranscriptionEngine = AppleSpeechTranscriptionEngine(),
-        userDefaults: UserDefaults = .standard
+        userDefaults: UserDefaults = .standard,
+        watchHistory: WatchHistoryStore = .ephemeral()
     ) {
         self.playbackEngine = playbackEngine
         self.transcriptionEngine = transcriptionEngine
         self.userDefaults = userDefaults
+        self.watchHistory = watchHistory
         subtitleStyles = Self.loadSubtitleStyles(from: userDefaults)
         subtitleStyleProfiles = Self.loadSubtitleStyleProfiles(from: userDefaults)
         selectedTranscriptionLocaleIdentifier = userDefaults.string(
             forKey: Self.transcriptionLocaleKey
         ) ?? Locale.current.identifier
+        continueWatching = watchHistory.unfinished()
     }
 
-    func open(_ url: URL) {
+    func open(_ url: URL, resumingAt position: TimeInterval? = nil) {
         let fileURL = url.resolvingSymlinksInPath().standardizedFileURL
-        if currentURL == fileURL { return }
+        persistWatchProgress()
+        if currentURL == fileURL {
+            if let position, position > 1 {
+                seek(to: position)
+            }
+            return
+        }
 
         accessedFileURL?.stopAccessingSecurityScopedResource()
         accessedFileURL = fileURL.startAccessingSecurityScopedResource() ? fileURL : nil
@@ -66,14 +79,60 @@ final class PlayerViewModel {
         cancelTranscription()
         setProgressiveTranscriptionEnabled(false)
         subtitleLoadTask?.cancel()
+        resumeTask?.cancel()
         subtitleTracks.removeAll()
         audioTracks.removeAll()
         isScrubbing = false
         playbackEngine.open(fileURL)
+        playbackEngine.play()
         currentURL = fileURL
         refreshPlaybackState()
         refreshAudioTracks()
         startSubtitleLoad(for: fileURL)
+        if let position, position > 1 {
+            resume(at: position)
+        }
+        persistWatchProgress(force: true)
+    }
+
+    func resumeWatching(_ item: WatchHistoryItem) {
+        guard let url = watchHistory.resolve(item) else {
+            forgetWatchHistory(item.id)
+            return
+        }
+        _ = url.startAccessingSecurityScopedResource()
+        open(url, resumingAt: item.position)
+    }
+
+    func forgetWatchHistory(_ id: String) {
+        watchHistory.remove(id)
+        continueWatching = watchHistory.unfinished()
+    }
+
+    private func resume(at position: TimeInterval) {
+        resumeTask?.cancel()
+        resumeTask = Task { @MainActor [weak self] in
+            for _ in 0..<40 {
+                try? await Task.sleep(for: .milliseconds(50))
+                guard let self, !Task.isCancelled else { return }
+                if duration > 0 {
+                    seek(to: min(position, max(duration - 1, 0)))
+                    persistWatchProgress(force: true)
+                    return
+                }
+            }
+            guard let self, !Task.isCancelled else { return }
+            seek(to: position)
+        }
+    }
+
+    func persistWatchProgress(force: Bool = false) {
+        guard let url = currentURL else { return }
+        let now = Date()
+        if !force, now.timeIntervalSince(lastHistorySave) < 2 { return }
+        lastHistorySave = now
+        watchHistory.upsert(url: url, position: currentTime, duration: duration)
+        continueWatching = watchHistory.unfinished()
     }
 
     func refreshPlaybackState() {
@@ -86,6 +145,7 @@ final class PlayerViewModel {
         if !state.hasSameControls(as: playbackState) {
             playbackState = state
         }
+        persistWatchProgress()
     }
 
     func togglePlayback() {
@@ -95,6 +155,7 @@ final class PlayerViewModel {
             playbackEngine.play()
         }
         refreshPlaybackState()
+        persistWatchProgress(force: true)
     }
 
     func seek(to time: TimeInterval) {
@@ -124,6 +185,7 @@ final class PlayerViewModel {
         isScrubbing = false
         refreshPlaybackState()
         playbackPositionDidJump()
+        persistWatchProgress(force: true)
     }
 
     func toggleSettingsPresented() {

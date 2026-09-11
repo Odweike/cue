@@ -29,6 +29,7 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertEqual(engine.currentURL, url)
         XCTAssertEqual(viewModel.currentURL, url)
+        XCTAssertTrue(viewModel.isPlaying)
 
         viewModel.open(url)
         XCTAssertEqual(engine.openCount, 1)
@@ -301,8 +302,13 @@ private final class PlaybackEngineSpy: PlaybackEngine {
         openCount += 1
     }
 
-    func play() {}
-    func pause() {}
+    func play() {
+        state.isPlaying = true
+    }
+
+    func pause() {
+        state.isPlaying = false
+    }
 
     func seek(to time: TimeInterval, exact: Bool) {
         seekTime = time
