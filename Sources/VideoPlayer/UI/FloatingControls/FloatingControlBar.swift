@@ -8,8 +8,7 @@ struct FloatingControlBar: View {
     var body: some View {
         TimelineView(
             .animation(
-                paused: CueMainControlsDrag.isActive
-                    || (!viewModel.isPlaying && !viewModel.isScrubbing)
+                paused: !viewModel.isPlaying && !viewModel.isScrubbing
             )
         ) { _ in
             controlBar
@@ -127,6 +126,7 @@ struct FloatingControlBar: View {
                 .monospacedDigit()
                 .frame(minWidth: 82, alignment: .leading)
                 .fixedSize(horizontal: true, vertical: false)
+                .allowsHitTesting(false)
 
             Slider(
                 value: Binding(
@@ -150,6 +150,7 @@ struct FloatingControlBar: View {
                 .monospacedDigit()
                 .frame(minWidth: 82, alignment: .trailing)
                 .fixedSize(horizontal: true, vertical: false)
+                .allowsHitTesting(false)
         }
     }
 
@@ -195,6 +196,7 @@ struct FloatingControlsOverlay: View {
     @AppStorage("CueControlsWidth") private var storedWidth = 620.0
     @AppStorage("CueControlsHeight") private var storedHeight = 132.0
     @GestureState private var resizeOffset = CGSize.zero
+    @GestureState private var moveOffset = CGSize.zero
 
     var body: some View {
         GeometryReader { geometry in
@@ -203,29 +205,37 @@ struct FloatingControlsOverlay: View {
                 width: panelSize.width - storedWidth,
                 height: panelSize.height - storedHeight
             )
-            let displayedOffset = CGSize(
+            let baseOffset = CGSize(
                 width: storedOffsetX + Self.offsetAdjustment(for: resizeDelta).width,
                 height: storedOffsetY + Self.offsetAdjustment(for: resizeDelta).height
             )
-
-            FloatingPanelCanvas(
+            let displayedOffset = Self.clampedOffset(
+                CGSize(
+                    width: baseOffset.width + moveOffset.width,
+                    height: baseOffset.height + moveOffset.height
+                ),
                 panelSize: panelSize,
-                offset: displayedOffset,
-                onMoveEnded: { newOffset in
-                    storedOffsetX = newOffset.width
-                    storedOffsetY = newOffset.height
+                availableSize: geometry.size
+            )
+            let origin = Self.origin(
+                for: displayedOffset,
+                panelSize: panelSize,
+                availableSize: geometry.size
+            )
+
+            panelChrome(panelSize: panelSize, in: geometry.size)
+                .position(
+                    x: origin.x + panelSize.width / 2,
+                    y: origin.y + panelSize.height / 2
+                )
+                .onAppear {
                     keepPanelVisible(in: geometry.size)
                 }
-            ) {
-                panelChrome(panelSize: panelSize, in: geometry.size)
-            }
-            .onAppear {
-                keepPanelVisible(in: geometry.size)
-            }
-            .onChange(of: geometry.size) { _, newSize in
-                keepPanelVisible(in: newSize)
-            }
+                .onChange(of: geometry.size) { _, newSize in
+                    keepPanelVisible(in: newSize)
+                }
         }
+        .ignoresSafeArea()
     }
 
     private func panelChrome(panelSize: CGSize, in availableSize: CGSize) -> some View {
@@ -238,9 +248,26 @@ struct FloatingControlsOverlay: View {
             )
             .scaleEffect(controlsScale)
             .frame(width: panelSize.width, height: panelSize.height)
-            .background(.clear)
+            .background {
+                PanelBackground()
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .gesture(moveGesture(in: availableSize))
+            }
             .overlay(alignment: .bottomTrailing) {
                 resizeHandle(in: availableSize)
+            }
+    }
+
+    private func moveGesture(in availableSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .updating($moveOffset) { value, state, _ in
+                state = value.translation
+            }
+            .onEnded { value in
+                storedOffsetX += value.translation.width
+                storedOffsetY += value.translation.height
+                keepPanelVisible(in: availableSize)
             }
     }
 
@@ -362,168 +389,15 @@ struct FloatingControlsOverlay: View {
     }
 }
 
-private struct FloatingPanelCanvas<Content: View>: NSViewRepresentable {
-    var panelSize: CGSize
-    var offset: CGSize
-    var onMoveEnded: (CGSize) -> Void
-    @ViewBuilder var content: Content
-
-    func makeNSView(context: Context) -> FloatingPanelCanvasView {
-        let view = FloatingPanelCanvasView()
-        view.hostingView.rootView = AnyView(content)
-        view.onMoveEnded = onMoveEnded
+private struct PanelBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .withinWindow
+        view.state = .active
+        view.appearance = NSAppearance(named: .darkAqua)
         return view
     }
 
-    func updateNSView(_ view: FloatingPanelCanvasView, context: Context) {
-        view.onMoveEnded = onMoveEnded
-        view.panelSize = panelSize
-        view.storedOffset = offset
-        if !view.isMoving {
-            view.hostingView.rootView = AnyView(content)
-            view.needsLayout = true
-        }
-    }
-}
-
-enum CueMainControlsDrag {
-    nonisolated(unsafe) static var isActive = false
-}
-
-private final class FloatingPanelCanvasView: NSView {
-    let panelView = NSView()
-    let effectView = NSVisualEffectView()
-    let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
-    private let moveHandle = MoveHandleView()
-    var panelSize: CGSize = .zero
-    var storedOffset: CGSize = .zero
-    var onMoveEnded: ((CGSize) -> Void)?
-    private(set) var isMoving = false
-    private var moveStartMouse = CGPoint.zero
-    private var moveStartOrigin = CGPoint.zero
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        panelView.wantsLayer = true
-        panelView.layer?.cornerRadius = 18
-        panelView.layer?.cornerCurve = .continuous
-        panelView.layer?.masksToBounds = true
-
-        effectView.material = .hudWindow
-        effectView.blendingMode = .withinWindow
-        effectView.state = .active
-        effectView.appearance = NSAppearance(named: .darkAqua)
-        effectView.autoresizingMask = [.width, .height]
-
-        hostingView.autoresizingMask = [.width, .height]
-        hostingView.safeAreaRegions = []
-
-        addSubview(panelView)
-        panelView.addSubview(effectView)
-        panelView.addSubview(hostingView)
-        moveHandle.canvas = self
-        moveHandle.setAccessibilityLabel("Move controls")
-        moveHandle.toolTip = "Drag to move"
-        moveHandle.autoresizingMask = [.width]
-        panelView.addSubview(moveHandle)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let hit = super.hitTest(point)
-        return hit === self ? nil : hit
-    }
-
-    override func layout() {
-        super.layout()
-        guard !isMoving else { return }
-        panelView.frame = CGRect(
-            origin: FloatingControlsOverlay.origin(
-                for: storedOffset,
-                panelSize: panelSize,
-                availableSize: bounds.size
-            ),
-            size: panelSize
-        )
-        effectView.frame = panelView.bounds
-        hostingView.frame = panelView.bounds
-        moveHandle.frame = CGRect(x: 0, y: 0, width: panelSize.width, height: 20)
-    }
-
-    func beginMove(with event: NSEvent) {
-        CueMainControlsDrag.isActive = true
-        isMoving = true
-        moveStartMouse = convert(event.locationInWindow, from: nil)
-        moveStartOrigin = panelView.frame.origin
-    }
-
-    func continueMove(with event: NSEvent) {
-        let mouse = convert(event.locationInWindow, from: nil)
-        let proposed = CGPoint(
-            x: moveStartOrigin.x + mouse.x - moveStartMouse.x,
-            y: moveStartOrigin.y + mouse.y - moveStartMouse.y
-        )
-        let size = panelView.frame.size
-        let offset = FloatingControlsOverlay.clampedOffset(
-            FloatingControlsOverlay.offset(
-                from: proposed,
-                panelSize: size,
-                availableSize: bounds.size
-            ),
-            panelSize: size,
-            availableSize: bounds.size
-        )
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        panelView.setFrameOrigin(
-            FloatingControlsOverlay.origin(
-                for: offset,
-                panelSize: size,
-                availableSize: bounds.size
-            )
-        )
-        CATransaction.commit()
-    }
-
-    func endMove() {
-        isMoving = false
-        CueMainControlsDrag.isActive = false
-        onMoveEnded?(
-            FloatingControlsOverlay.offset(
-                from: panelView.frame.origin,
-                panelSize: panelView.frame.size,
-                availableSize: bounds.size
-            )
-        )
-    }
-}
-
-private final class MoveHandleView: NSView {
-    weak var canvas: FloatingPanelCanvasView?
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .openHand)
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        NSCursor.closedHand.push()
-        canvas?.beginMove(with: event)
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        canvas?.continueMove(with: event)
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        canvas?.endMove()
-        NSCursor.pop()
-    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
