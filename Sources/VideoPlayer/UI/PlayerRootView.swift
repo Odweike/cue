@@ -70,7 +70,7 @@ struct PlayerRootView: View {
             }
         }
         .background {
-            SpacePlaybackCatcher(viewModel: viewModel)
+            PlaybackKeyCatcher(viewModel: viewModel)
         }
         .alert("Playback Error", isPresented: Binding(
             get: { viewModel.playbackError != nil },
@@ -84,21 +84,21 @@ struct PlayerRootView: View {
     }
 }
 
-private struct SpacePlaybackCatcher: NSViewRepresentable {
+private struct PlaybackKeyCatcher: NSViewRepresentable {
     let viewModel: PlayerViewModel
 
-    func makeNSView(context: Context) -> SpacePlaybackCatcherView {
-        let view = SpacePlaybackCatcherView()
+    func makeNSView(context: Context) -> PlaybackKeyCatcherView {
+        let view = PlaybackKeyCatcherView()
         view.viewModel = viewModel
         return view
     }
 
-    func updateNSView(_ nsView: SpacePlaybackCatcherView, context: Context) {
+    func updateNSView(_ nsView: PlaybackKeyCatcherView, context: Context) {
         nsView.viewModel = viewModel
     }
 }
 
-private final class SpacePlaybackCatcherView: NSView {
+private final class PlaybackKeyCatcherView: NSView {
     var viewModel: PlayerViewModel?
     nonisolated(unsafe) private var monitor: Any?
 
@@ -132,14 +132,24 @@ private final class SpacePlaybackCatcherView: NSView {
 
     private func handle(_ event: NSEvent) -> NSEvent? {
         guard viewModel?.currentURL != nil else { return event }
-        guard event.keyCode == 49 else { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard modifiers.isEmpty else { return event }
         if Self.isEditingText { return event }
-        if !event.isARepeat {
-            viewModel?.togglePlayback()
+        switch event.keyCode {
+        case 49: // Space
+            if !event.isARepeat {
+                viewModel?.togglePlayback()
+            }
+            return nil
+        case 123: // Left arrow
+            viewModel?.skip(by: -10)
+            return nil
+        case 124: // Right arrow
+            viewModel?.skip(by: 10)
+            return nil
+        default:
+            return event
         }
-        return nil
     }
 
     private static var isEditingText: Bool {
