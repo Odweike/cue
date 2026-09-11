@@ -7,6 +7,10 @@ struct SubtitleStyleEditor: View {
 
     var body: some View {
         Form {
+            Section("Tracks") {
+                SubtitleTrackList(viewModel: viewModel)
+            }
+
             Section("Generate Subtitles") {
                 if viewModel.supportedTranscriptionLocales.isEmpty {
                     HStack {

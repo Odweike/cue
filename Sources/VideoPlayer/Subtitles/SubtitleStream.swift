@@ -24,7 +24,7 @@ struct SubtitleStream: Identifiable, Equatable, Sendable {
     var displayName: String {
         var parts: [String] = []
         if let language, !language.isEmpty {
-            parts.append(language.uppercased())
+            parts.append(LanguageName.displayName(for: language))
         }
         if let title, !title.isEmpty {
             parts.append(title)
