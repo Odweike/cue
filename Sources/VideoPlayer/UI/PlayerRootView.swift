@@ -13,6 +13,11 @@ struct PlayerRootView: View {
             AVPlayerContainerView(playerView: viewModel.playbackEngine.renderView)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transaction { $0.animation = nil }
+                .onTapGesture {
+                    if viewModel.isSettingsPresented {
+                        viewModel.toggleSettingsPresented()
+                    }
+                }
 
             if viewModel.currentURL == nil {
                 WelcomeView(viewModel: viewModel)
