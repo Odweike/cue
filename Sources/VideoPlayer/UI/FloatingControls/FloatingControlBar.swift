@@ -15,6 +15,7 @@ struct FloatingControlBar: View {
                 .onChange(of: context.date) { _, _ in
                     viewModel.refreshPlaybackState()
                 }
+                .transaction { $0.animation = nil }
         }
     }
 
