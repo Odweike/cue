@@ -131,21 +131,14 @@ struct FloatingControlBar: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .allowsHitTesting(false)
 
-            Slider(
-                value: Binding(
-                    get: { displayedTime },
-                    set: { viewModel.updateScrubbing(to: $0) }
-                ),
-                in: 0...max(viewModel.duration, 0.01),
-                onEditingChanged: { isEditing in
-                    if isEditing {
-                        viewModel.beginScrubbing()
-                    } else {
-                        viewModel.endScrubbing()
-                    }
-                }
+            TimelineSlider(
+                value: displayedTime,
+                range: 0...max(viewModel.duration, 0.01),
+                onBeginScrubbing: { viewModel.beginScrubbing() },
+                onScrub: { viewModel.updateScrubbing(to: $0) },
+                onEndScrubbing: { viewModel.endScrubbing() }
             )
-            .tint(.white.opacity(0.9))
+            .frame(maxWidth: .infinity)
             .accessibilityLabel("Timeline")
 
             Text(PlaybackTimeFormat.string(from: viewModel.duration, includingHours: showsHours))

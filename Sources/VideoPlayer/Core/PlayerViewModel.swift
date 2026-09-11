@@ -205,7 +205,7 @@ final class PlayerViewModel {
         }
         scrubTime = time
         let now = Date()
-        guard now.timeIntervalSince(lastScrubSeek) >= 0.08 else { return }
+        guard now.timeIntervalSince(lastScrubSeek) >= 0.05 else { return }
         lastScrubSeek = now
         playbackEngine.seek(to: time, exact: false)
     }
