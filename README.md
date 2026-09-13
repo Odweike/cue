@@ -5,7 +5,7 @@
 <h1 align="center">Cue</h1>
 
 <p align="center">
-  A native macOS video player with local, on-device subtitles.
+  A free, open-source macOS video player with local, on-device subtitles.
 </p>
 
 <p align="center">
@@ -22,7 +22,9 @@
   <a href="#features">Features</a>
 </p>
 
-Cue plays common local video files (MKV, MP4, MOV, and more) through an embedded LGPL build of libmpv. Subtitles can be imported, styled independently for two tracks, or generated on your Mac with Apple Speech — nothing is sent to a cloud recognizer.
+Cue is a free, open-source video player for Mac — a lightweight native alternative to VLC and IINA. It plays common local video files (MKV, MP4, MOV, and more) through an embedded LGPL build of libmpv. Subtitles can be imported (SRT, VTT, ASS), styled independently for two tracks, or generated offline on your Mac with Apple Speech — an on-device AI subtitle generator that sends nothing to a cloud recognizer.
+
+If Cue is useful to you, a ⭐ on GitHub helps others find the project.
 
 ## Screenshots
 
