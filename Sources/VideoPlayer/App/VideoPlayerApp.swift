@@ -4,6 +4,12 @@ import SwiftUI
 @MainActor
 final class CueAppDelegate: NSObject, NSApplicationDelegate {
     let viewModel = PlayerViewModel(playbackEngine: MPVPlaybackEngine(), watchHistory: .live)
+    private let pictureInPicture = PictureInPictureController()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        pictureInPicture.attach(viewModel)
+        viewModel.pictureInPicture = pictureInPicture
+    }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first(where: VideoFilePicker.canOpen) else { return }

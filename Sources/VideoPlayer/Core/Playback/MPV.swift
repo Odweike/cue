@@ -21,4 +21,12 @@ enum MPV {
         defer { arguments.compactMap { $0 }.forEach { free(UnsafeMutablePointer(mutating: $0)) } }
         return mpv_command(context, &arguments)
     }
+
+    @discardableResult
+    static func commandAsync(_ values: [String], on context: OpaquePointer) -> Int32 {
+        var arguments = values.map { UnsafePointer<CChar>(strdup($0)) }
+        arguments.append(nil)
+        defer { arguments.compactMap { $0 }.forEach { free(UnsafeMutablePointer(mutating: $0)) } }
+        return mpv_command_async(context, 0, &arguments)
+    }
 }

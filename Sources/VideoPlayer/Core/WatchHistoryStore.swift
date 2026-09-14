@@ -7,6 +7,34 @@ struct WatchHistoryItem: Codable, Identifiable, Equatable, Sendable {
     var position: TimeInterval
     var duration: TimeInterval
     var updatedAt: Date
+    var settings: VideoPlaybackSettings?
+}
+
+struct VideoPlaybackSettings: Codable, Equatable, Sendable {
+    var audioTrackID: Int64?
+    var audioLanguage: String?
+    var volume: Float?
+    var isMuted: Bool?
+    var playbackRate: Float?
+    var audioDelay: TimeInterval?
+    var videoScalingMode: VideoScalingMode?
+    var aspectRatio: VideoRatio?
+    var cropRatio: VideoRatio?
+    var rotation: VideoRotation?
+    var hardwareDecoding: Bool?
+    var deinterlacing: Bool?
+    var videoEqualizer: VideoEqualizer?
+
+    func matchingAudioTrack(in tracks: [AudioTrack]) -> AudioTrack? {
+        if let audioTrackID, let track = tracks.first(where: { $0.id == audioTrackID }) {
+            return track
+        }
+        if let audioLanguage {
+            let language = audioLanguage.lowercased()
+            return tracks.first { $0.language?.lowercased() == language }
+        }
+        return nil
+    }
 }
 
 @MainActor
@@ -34,25 +62,33 @@ final class WatchHistoryStore {
         items.filter { !$0.isFinished }
     }
 
-    func upsert(url: URL, position: TimeInterval, duration: TimeInterval) {
+    func item(for url: URL) -> WatchHistoryItem? {
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        return items.first { $0.id == path }
+    }
+
+    func upsert(
+        url: URL,
+        position: TimeInterval,
+        duration: TimeInterval,
+        settings: VideoPlaybackSettings? = nil
+    ) {
         let fileURL = url.resolvingSymlinksInPath().standardizedFileURL
+        let previous = items.first { $0.id == fileURL.path }
         let item = WatchHistoryItem(
             id: fileURL.path,
             bookmark: (try? fileURL.bookmarkData(
                 options: .withSecurityScope,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
-            )) ?? Data(),
+            )) ?? previous?.bookmark ?? Data(),
             fileName: fileURL.lastPathComponent,
             position: max(position, 0),
             duration: max(duration, 0),
-            updatedAt: Date()
+            updatedAt: Date(),
+            settings: settings ?? previous?.settings
         )
         items.removeAll { $0.id == item.id }
-        if item.isFinished {
-            save()
-            return
-        }
         items.insert(item, at: 0)
         if items.count > limit {
             items = Array(items.prefix(limit))

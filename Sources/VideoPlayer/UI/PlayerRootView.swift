@@ -31,6 +31,20 @@ struct PlayerRootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .overlay(alignment: .topLeading) {
+            if viewModel.currentURL != nil, let percent = viewModel.volumeHUDPercent {
+                Text("\(percent)%")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .padding(.top, 14)
+                    .padding(.leading, 16)
+                    .allowsHitTesting(false)
+            }
+        }
         .animation(.easeOut(duration: 0.2), value: viewModel.currentURL)
         .overlay(alignment: .trailing) {
             if viewModel.currentURL != nil {
@@ -132,7 +146,9 @@ private final class PlaybackKeyCatcherView: NSView {
 
     private func handle(_ event: NSEvent) -> NSEvent? {
         guard viewModel?.currentURL != nil else { return event }
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let modifiers = event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.numericPad, .function])
         guard modifiers.isEmpty else { return event }
         if Self.isEditingText { return event }
         switch event.keyCode {
@@ -146,6 +162,17 @@ private final class PlaybackKeyCatcherView: NSView {
             return nil
         case 124: // Right arrow
             viewModel?.skip(by: 10)
+            return nil
+        case 125: // Down arrow
+            viewModel?.nudgeVolume(by: -0.05)
+            return nil
+        case 126: // Up arrow
+            viewModel?.nudgeVolume(by: 0.05)
+            return nil
+        case 37: // L
+            if !event.isARepeat {
+                viewModel?.cycleABLoop()
+            }
             return nil
         default:
             return event

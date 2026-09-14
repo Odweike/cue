@@ -9,11 +9,43 @@ struct AudioTrack: Identifiable, Equatable, Sendable {
     let isSelected: Bool
 
     var displayName: String {
-        var details = [title, language?.uppercased(), codec?.uppercased()]
-            .compactMap { $0 }
-        if channelCount > 0 {
-            details.append("\(channelCount) ch")
+        displayName(locale: .current)
+    }
+
+    func displayName(locale: Locale) -> String {
+        var parts: [String] = []
+        if let language, !language.isEmpty {
+            parts.append(LanguageName.displayName(for: language, locale: locale))
         }
-        return details.isEmpty ? "Audio Track \(id)" : details.joined(separator: " • ")
+        if let title, !title.isEmpty, !Self.isGenericTitle(title, language: language, codec: codec, locale: locale) {
+            parts.append(title)
+        }
+        if channelCount > 0 {
+            parts.append("\(channelCount) ch")
+        }
+        return parts.isEmpty ? "Audio Track \(id)" : parts.joined(separator: " • ")
+    }
+
+    private static let genericTitles: Set<String> = [
+        "mov", "mp4", "m4a", "mkv", "und", "audio", "track", "unknown"
+    ]
+
+    private static func isGenericTitle(
+        _ title: String,
+        language: String?,
+        codec: String?,
+        locale: Locale
+    ) -> Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        if genericTitles.contains(lower) { return true }
+        if let codec, lower == codec.lowercased() { return true }
+        if let language {
+            if lower == language.lowercased() { return true }
+            if lower == LanguageName.displayName(for: language, locale: locale).lowercased() {
+                return true
+            }
+        }
+        return false
     }
 }

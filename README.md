@@ -39,7 +39,7 @@ If Cue is useful to you, a ⭐ on GitHub helps others find the project.
 ## Install
 
 1. Open [playrito.site/cue](https://playrito.site/cue/) or the [GitHub release](https://github.com/Odweike/cue/releases/latest).
-2. Download **Cue-0.1.3.dmg**.
+2. Download **Cue-0.1.5.dmg**.
 3. Open the disk image and drag **Cue** into **Applications**.
 4. Launch Cue from Applications.
 
@@ -82,7 +82,7 @@ xcodebuild \
 Package a disk image after a successful Release build:
 
 ```sh
-./scripts/package-dmg.sh 0.1.3
+./scripts/package-dmg.sh 0.1.5
 ```
 
 ## Architecture

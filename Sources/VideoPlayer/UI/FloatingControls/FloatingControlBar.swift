@@ -87,11 +87,27 @@ struct FloatingControlBar: View {
     }
 
     private var trailingActions: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 12) {
+            Button {
+                viewModel.cycleABLoop()
+            } label: {
+                Text(abLoopTitle)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+            }
+            .help("A–B Loop")
+            .accessibilityLabel("A–B Loop")
+
+            Button {
+                viewModel.togglePictureInPicture()
+            } label: {
+                Image(systemName: viewModel.isPictureInPicture ? "pip.exit" : "pip.enter")
+            }
+            .help("Picture in Picture")
+
             Button {
                 NSApp.keyWindow?.toggleFullScreen(nil)
             } label: {
-                Image(systemName: "pip.enter")
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
             }
             .help("Full Screen")
 
@@ -114,7 +130,13 @@ struct FloatingControlBar: View {
         }
         .font(.system(size: 17, weight: .medium))
         .buttonStyle(.plain)
-        .frame(maxWidth: 100, alignment: .trailing)
+        .frame(maxWidth: 180, alignment: .trailing)
+    }
+
+    private var abLoopTitle: String {
+        if viewModel.loopA == nil { return "A–B" }
+        if viewModel.loopB == nil { return "A·" }
+        return "A–B·"
     }
 
     private var timeline: some View {
@@ -134,6 +156,10 @@ struct FloatingControlBar: View {
             TimelineSlider(
                 value: displayedTime,
                 range: 0...max(viewModel.duration, 0.01),
+                chapters: viewModel.chapters,
+                loopA: viewModel.loopA,
+                loopB: viewModel.loopB,
+                thumbnail: { viewModel.thumbnail(at: $0) },
                 onBeginScrubbing: { viewModel.beginScrubbing() },
                 onScrub: { viewModel.updateScrubbing(to: $0) },
                 onEndScrubbing: { viewModel.endScrubbing() }
@@ -193,6 +219,8 @@ struct FloatingControlsOverlay: View {
     @AppStorage("CueControlsHeight") private var storedHeight = 132.0
     @GestureState private var resizeOffset = CGSize.zero
     @GestureState private var moveOffset = CGSize.zero
+    @State private var isVisible = true
+    @State private var hideTask: Task<Void, Never>?
 
     var body: some View {
         GeometryReader { geometry in
@@ -224,14 +252,56 @@ struct FloatingControlsOverlay: View {
                     x: origin.x + panelSize.width / 2,
                     y: origin.y + panelSize.height / 2
                 )
+                .opacity(isVisible ? 1 : 0)
+                .allowsHitTesting(isVisible)
                 .onAppear {
                     keepPanelVisible(in: geometry.size)
+                    showControls()
                 }
                 .onChange(of: geometry.size) { _, newSize in
                     keepPanelVisible(in: newSize)
                 }
+                .onChange(of: viewModel.isPlaying) { _, playing in
+                    if playing {
+                        scheduleHide()
+                    } else {
+                        showControls()
+                    }
+                }
+                .onChange(of: viewModel.isSettingsPresented) { _, isOpen in
+                    if isOpen {
+                        showControls()
+                    } else {
+                        scheduleHide()
+                    }
+                }
         }
+        .background {
+            MouseActivityCatcher(onActivity: showControls)
+        }
+        .animation(.easeOut(duration: 0.22), value: isVisible)
         .ignoresSafeArea()
+    }
+
+    private func showControls() {
+        isVisible = true
+        scheduleHide()
+    }
+
+    private func scheduleHide() {
+        hideTask?.cancel()
+        guard viewModel.isPlaying, !viewModel.isSettingsPresented else {
+            hideTask = nil
+            isVisible = true
+            return
+        }
+        hideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            guard viewModel.isPlaying, !viewModel.isSettingsPresented else { return }
+            isVisible = false
+            NSCursor.setHiddenUntilMouseMoves(true)
+        }
     }
 
     private func panelChrome(panelSize: CGSize, in availableSize: CGSize) -> some View {
@@ -382,6 +452,69 @@ struct FloatingControlsOverlay: View {
         )
         storedOffsetX = clamped.width
         storedOffsetY = clamped.height
+    }
+}
+
+private struct MouseActivityCatcher: NSViewRepresentable {
+    var onActivity: () -> Void
+
+    func makeNSView(context: Context) -> MouseActivityCatcherView {
+        let view = MouseActivityCatcherView()
+        view.onActivity = onActivity
+        return view
+    }
+
+    func updateNSView(_ nsView: MouseActivityCatcherView, context: Context) {
+        nsView.onActivity = onActivity
+    }
+}
+
+private final class MouseActivityCatcherView: NSView {
+    var onActivity: (() -> Void)?
+    nonisolated(unsafe) private var monitor: Any?
+    private var lastMouseLocation = NSPoint.zero
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.acceptsMouseMovedEvents = true
+        if window == nil {
+            stopMonitoring()
+        } else {
+            startMonitoring()
+        }
+    }
+
+    deinit {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+
+    private func startMonitoring() {
+        guard monitor == nil else { return }
+        lastMouseLocation = NSEvent.mouseLocation
+        monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged]
+        ) { [weak self] event in
+            self?.handle(event)
+            return event
+        }
+    }
+
+    private func handle(_ event: NSEvent) {
+        let location = NSEvent.mouseLocation
+        let moved = hypot(location.x - lastMouseLocation.x, location.y - lastMouseLocation.y)
+        guard moved >= 1 else { return }
+        lastMouseLocation = location
+        onActivity?()
+    }
+
+    private func stopMonitoring() {
+        guard let monitor else { return }
+        NSEvent.removeMonitor(monitor)
+        self.monitor = nil
     }
 }
 

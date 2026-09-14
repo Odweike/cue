@@ -73,6 +73,7 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.audioDelay, 0.4)
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.skipInterval, 10)
+        XCTAssertEqual(viewModel.currentTime, 10)
     }
 
     func testScrubbingSeeksWithKeyframesUntilRelease() {
@@ -87,11 +88,32 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.seekExact, true)
     }
 
+    func testABLoopCyclesFromAToBThenClears() {
+        let engine = PlaybackEngineSpy()
+        engine.state.currentTime = 12
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        viewModel.refreshPlaybackState()
+
+        viewModel.cycleABLoop()
+        XCTAssertEqual(engine.loopA, 12)
+        XCTAssertNil(engine.loopB)
+
+        engine.state.currentTime = 40
+        viewModel.refreshPlaybackState()
+        viewModel.cycleABLoop()
+        XCTAssertEqual(engine.loopA, 12)
+        XCTAssertEqual(engine.loopB, 40)
+
+        viewModel.cycleABLoop()
+        XCTAssertNil(engine.loopA)
+        XCTAssertNil(engine.loopB)
+    }
+
     func testMuteTogglePreservesVolume() {
         let engine = PlaybackEngineSpy()
         engine.state.volume = 0.4
         let viewModel = PlayerViewModel(playbackEngine: engine)
-        viewModel.refreshPlaybackState()
+        viewModel.refreshPlaybackState(includingControls: true)
 
         viewModel.toggleMuted()
 
@@ -102,6 +124,18 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertFalse(viewModel.playbackState.isMuted)
         XCTAssertEqual(viewModel.playbackState.volume, 0.4)
+    }
+
+    func testNudgeVolumeShowsPercentHUD() {
+        let engine = PlaybackEngineSpy()
+        engine.state.volume = 0.4
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        viewModel.refreshPlaybackState(includingControls: true)
+
+        viewModel.nudgeVolume(by: 0.05)
+
+        XCTAssertEqual(engine.volume, 0.45)
+        XCTAssertEqual(viewModel.volumeHUDPercent, 45)
     }
 
     func testAudioTracksCanBeLoadedAndSelected() {
@@ -121,8 +155,22 @@ final class PlayerViewModelTests: XCTestCase {
         viewModel.refreshAudioTracks()
         viewModel.selectAudioTrack(2)
 
-        XCTAssertEqual(viewModel.audioTracks.first?.displayName, "Original • ENG • AAC • 6 ch")
+        XCTAssertEqual(
+            viewModel.audioTracks.first?.displayName(locale: Locale(identifier: "en_US")),
+            "English • Original • 6 ch"
+        )
         XCTAssertEqual(engine.selectedAudioTrackID, 2)
+        XCTAssertEqual(
+            AudioTrack(
+                id: 1,
+                title: "MOV",
+                language: "jpn",
+                codec: "aac",
+                channelCount: 2,
+                isSelected: false
+            ).displayName(locale: Locale(identifier: "en_US")),
+            "Japanese • 2 ch"
+        )
     }
 
     func testSubtitleStylesPersistBetweenViewModels() {
@@ -205,6 +253,24 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.seekExact, true)
+    }
+
+    func testOpeningTheSameFileFromFinderResumesSavedPosition() {
+        let historyURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cue-history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: historyURL) }
+        let video = URL(fileURLWithPath: "/tmp/movie.mkv")
+        let store = WatchHistoryStore(fileURL: historyURL)
+        store.upsert(url: video, position: 80, duration: 120)
+
+        let engine = PlaybackEngineSpy()
+        let viewModel = PlayerViewModel(playbackEngine: engine, watchHistory: store)
+        viewModel.open(video)
+        engine.state.duration = 120
+        engine.eventHandler?(.fileReady)
+
+        XCTAssertEqual(engine.seekTime, 80)
+        XCTAssertEqual(store.item(for: video)?.position, 80)
     }
 
     func testFailedToOpenReturnsToWelcomeWithError() {
@@ -327,10 +393,16 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     private(set) var seekTime: TimeInterval?
     private(set) var seekExact: Bool?
     private(set) var skipInterval: TimeInterval?
+    private(set) var loopA: TimeInterval?
+    private(set) var loopB: TimeInterval?
 
     func open(_ url: URL) {
         currentURL = url
         openCount += 1
+    }
+
+    func playbackClock() -> (time: TimeInterval, duration: TimeInterval, isPlaying: Bool) {
+        (state.currentTime, state.duration, state.isPlaying)
     }
 
     func play() {
@@ -406,5 +478,24 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func setAudioDelay(_ delay: TimeInterval) {
         audioDelay = delay
+    }
+
+    func chapters() -> [PlaybackChapter] {
+        []
+    }
+
+    func cycleABLoop(at time: TimeInterval) {
+        if loopA == nil {
+            loopA = time
+        } else if loopB == nil {
+            loopB = time
+        } else {
+            clearABLoop()
+        }
+    }
+
+    func clearABLoop() {
+        loopA = nil
+        loopB = nil
     }
 }

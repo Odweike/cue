@@ -1,14 +1,14 @@
 import AppKit
 import Foundation
 
-enum VideoScalingMode: String, CaseIterable, Identifiable, Sendable {
+enum VideoScalingMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case fit
     case fill
 
     var id: Self { self }
 }
 
-enum VideoRatio: String, CaseIterable, Identifiable, Sendable {
+enum VideoRatio: String, CaseIterable, Identifiable, Codable, Sendable {
     case automatic
     case ratio4x3 = "4:3"
     case ratio16x9 = "16:9"
@@ -20,7 +20,7 @@ enum VideoRatio: String, CaseIterable, Identifiable, Sendable {
     var mpvValue: String { self == .automatic ? "no" : rawValue }
 }
 
-enum VideoRotation: Int, CaseIterable, Identifiable, Sendable {
+enum VideoRotation: Int, CaseIterable, Identifiable, Codable, Sendable {
     case degrees0 = 0
     case degrees90 = 90
     case degrees180 = 180
@@ -29,7 +29,7 @@ enum VideoRotation: Int, CaseIterable, Identifiable, Sendable {
     var id: Self { self }
 }
 
-struct VideoEqualizer: Equatable, Sendable {
+struct VideoEqualizer: Codable, Equatable, Sendable {
     var brightness = 0.0
     var contrast = 0.0
     var saturation = 0.0
@@ -68,6 +68,12 @@ struct PlaybackState: Equatable, Sendable {
     }
 }
 
+struct PlaybackChapter: Equatable, Sendable, Identifiable {
+    var id: TimeInterval { start }
+    var start: TimeInterval
+    var title: String
+}
+
 enum PlaybackEngineEvent: Sendable {
     case fileReady
     case failedToOpen(String)
@@ -79,7 +85,10 @@ protocol PlaybackEngine: AnyObject {
     var renderView: NSView { get }
     var currentURL: URL? { get }
     var state: PlaybackState { get }
+    var loopA: TimeInterval? { get }
+    var loopB: TimeInterval? { get }
 
+    func playbackClock() -> (time: TimeInterval, duration: TimeInterval, isPlaying: Bool)
     func open(_ url: URL)
     func play()
     func pause()
@@ -99,4 +108,7 @@ protocol PlaybackEngine: AnyObject {
     func subtitleStreams() -> [SubtitleStream]
     func selectAudioTrack(_ id: Int64)
     func setAudioDelay(_ delay: TimeInterval)
+    func chapters() -> [PlaybackChapter]
+    func cycleABLoop(at time: TimeInterval)
+    func clearABLoop()
 }

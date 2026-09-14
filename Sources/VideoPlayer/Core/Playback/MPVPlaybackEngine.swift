@@ -16,6 +16,8 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private var deinterlacing = false
     private var videoEqualizer = VideoEqualizer()
     private var audioDelay: TimeInterval = 0
+    private(set) var loopA: TimeInterval?
+    private(set) var loopB: TimeInterval?
 
     private(set) var currentURL: URL?
     var renderView: NSView { playerView }
@@ -61,7 +63,9 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setOption("video-align-x", to: "0")
         setOption("video-align-y", to: "0")
         setOption("vo", to: "libmpv")
-        setOption("hwdec", to: "videotoolbox-copy")
+        setOption("hwdec", to: "auto")
+        setOption("hr-seek", to: "no")
+        setOption("hr-seek-framedrop", to: "yes")
         setOption("sid", to: "no")
         setOption("sub-visibility", to: "no")
 
@@ -101,25 +105,37 @@ final class MPVPlaybackEngine: PlaybackEngine {
 
     func open(_ url: URL) {
         currentURL = url
+        clearABLoop()
         command("loadfile", url.path(percentEncoded: false), "replace")
         play()
     }
 
     func play() {
+        playerView.displayActive()
         setFlag("pause", to: false)
     }
 
     func pause() {
         setFlag("pause", to: true)
+        playerView.displayIdle()
     }
 
     func seek(to time: TimeInterval, exact: Bool) {
+        wakeDisplayLinkForSeek()
         let mode = exact ? "absolute+exact" : "absolute+keyframes"
         command("seek", String(max(time, 0)), mode)
     }
 
     func skip(by interval: TimeInterval) {
-        command("seek", String(interval), "relative")
+        wakeDisplayLinkForSeek()
+        MPV.commandAsync(["seek", String(interval), "relative"], on: context)
+    }
+
+    private func wakeDisplayLinkForSeek() {
+        playerView.displayActive()
+        if boolProperty("pause") {
+            playerView.displayIdle()
+        }
     }
 
     func setVolume(_ volume: Float) {
@@ -157,7 +173,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
 
     func setHardwareDecoding(_ isEnabled: Bool) {
         hardwareDecoding = isEnabled
-        setString("hwdec", to: isEnabled ? "videotoolbox-copy" : "no")
+        setString("hwdec", to: isEnabled ? "auto" : "no")
     }
 
     func setDeinterlacing(_ isEnabled: Bool) {
@@ -172,6 +188,14 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setDouble("saturation", to: equalizer.saturation)
         setDouble("gamma", to: equalizer.gamma)
         setDouble("hue", to: equalizer.hue)
+    }
+
+    func playbackClock() -> (time: TimeInterval, duration: TimeInterval, isPlaying: Bool) {
+        (
+            nonnegative(doubleProperty("time-pos")),
+            nonnegative(doubleProperty("duration")),
+            !boolProperty("pause")
+        )
     }
 
     func audioTracks() -> [AudioTrack] {
@@ -218,6 +242,35 @@ final class MPVPlaybackEngine: PlaybackEngine {
     func setAudioDelay(_ delay: TimeInterval) {
         audioDelay = min(max(delay, -5), 5)
         setDouble("audio-delay", to: audioDelay)
+    }
+
+    func chapters() -> [PlaybackChapter] {
+        let count = max(int64Property("chapter-list/count"), 0)
+        return (0..<count).map { index in
+            PlaybackChapter(
+                start: nonnegative(doubleProperty("chapter-list/\(index)/time")),
+                title: stringProperty("chapter-list/\(index)/title") ?? "Chapter \(index + 1)"
+            )
+        }
+    }
+
+    func cycleABLoop(at time: TimeInterval) {
+        if loopA == nil {
+            loopA = max(time, 0)
+            setDouble("ab-loop-a", to: loopA ?? 0)
+        } else if loopB == nil {
+            loopB = max(time, 0)
+            setDouble("ab-loop-b", to: loopB ?? 0)
+        } else {
+            clearABLoop()
+        }
+    }
+
+    func clearABLoop() {
+        loopA = nil
+        loopB = nil
+        setString("ab-loop-a", to: "no")
+        setString("ab-loop-b", to: "no")
     }
 
     private func command(_ values: String...) {

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -26,6 +27,10 @@ final class PlayerViewModel {
     private let watchHistory: WatchHistoryStore
     private var lastHistorySave = Date.distantPast
     private var lastScrubSeek = Date.distantPast
+    private var skipFreezeUntil = Date.distantPast
+    private var timeBeforeSkip: TimeInterval = 0
+    private var transcriptionRestartTask: Task<Void, Never>?
+    private var hasRestoredPlaybackSettings = false
     private(set) var currentURL: URL?
     private(set) var playbackError: String?
     private(set) var currentTime: TimeInterval = 0
@@ -47,6 +52,17 @@ final class PlayerViewModel {
     private(set) var isScrubbing = false
     private(set) var scrubTime: TimeInterval = 0
     private(set) var continueWatching: [WatchHistoryItem] = []
+    private(set) var volumeHUDPercent: Int?
+    private var volumeHUDHideTask: Task<Void, Never>?
+    private let nowPlaying = NowPlayingController()
+    private let thumbnails = VideoThumbnailCache()
+    private var lastNowPlayingSync = Date.distantPast
+    private var lastNowPlayingIsPlaying: Bool?
+    var pictureInPicture: PictureInPictureController?
+    private(set) var isPictureInPicture = false
+    private(set) var chapters: [PlaybackChapter] = []
+    private(set) var loopA: TimeInterval?
+    private(set) var loopB: TimeInterval?
 
     init(
         playbackEngine: any PlaybackEngine,
@@ -64,6 +80,7 @@ final class PlayerViewModel {
             forKey: Self.transcriptionLocaleKey
         ) ?? Locale.current.identifier
         continueWatching = watchHistory.unfinished()
+        nowPlaying.attach(self)
 
         self.playbackEngine.eventHandler = { [weak self] event in
             self?.handleEngineEvent(event)
@@ -72,7 +89,7 @@ final class PlayerViewModel {
 
     func open(_ url: URL, resumingAt position: TimeInterval? = nil) {
         let fileURL = url.resolvingSymlinksInPath().standardizedFileURL
-        persistWatchProgress()
+        persistWatchProgress(force: true)
         if currentURL == fileURL {
             if let position, position > 1 {
                 seek(to: position)
@@ -82,17 +99,18 @@ final class PlayerViewModel {
 
         teardownCurrentFile()
         accessedFileURL = fileURL.startAccessingSecurityScopedResource() ? fileURL : nil
+        hasRestoredPlaybackSettings = false
 
         playbackEngine.open(fileURL)
         playbackEngine.play()
         currentURL = fileURL
-        if let position, position > 1 {
-            pendingResumePosition = position
+        let resumeAt = position ?? watchHistory.item(for: fileURL)?.position
+        if let resumeAt, resumeAt > 1 {
+            pendingResumePosition = resumeAt
         }
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
         refreshAudioTracks()
         startSubtitleLoad(for: fileURL)
-        persistWatchProgress(force: true)
     }
 
     private func teardownCurrentFile() {
@@ -110,23 +128,38 @@ final class PlayerViewModel {
         mediaLoadID = UUID()
         accessedFileURL?.stopAccessingSecurityScopedResource()
         accessedFileURL = nil
+        hasRestoredPlaybackSettings = false
+        chapters = []
+        loopA = nil
+        loopB = nil
+        thumbnails.cancel()
+        nowPlaying.stop()
+        SleepPreventer.update(isPlaying: false)
+        pictureInPicture?.exitIfNeeded()
+        playbackEngine.clearABLoop()
     }
 
     private func handleEngineEvent(_ event: PlaybackEngineEvent) {
         guard playbackEngine.currentURL == currentURL else { return }
         switch event {
         case .fileReady:
-            refreshPlaybackState()
+            refreshPlaybackState(includingControls: true)
             refreshAudioTracks()
+            restorePlaybackSettingsIfNeeded()
             resumePendingPositionIfNeeded()
             loadEmbeddedSubtitleStreams()
+            chapters = playbackEngine.chapters()
+            if let url = currentURL {
+                nowPlaying.start(title: url.lastPathComponent)
+                thumbnails.prepare(url: url, duration: duration)
+            }
         case .failedToOpen(let message):
             if let failedURL = currentURL {
                 watchHistory.remove(failedURL.path)
             }
             teardownCurrentFile()
             currentURL = nil
-            refreshPlaybackState()
+            refreshPlaybackState(includingControls: true)
             continueWatching = watchHistory.unfinished()
             playbackError = message
         }
@@ -138,9 +171,9 @@ final class PlayerViewModel {
 
     private func resumePendingPositionIfNeeded() {
         guard let position = pendingResumePosition else { return }
-        pendingResumePosition = nil
-        seek(to: duration > 1 ? min(position, duration - 1) : position)
-        persistWatchProgress(force: true)
+        let target = duration > 1 ? min(position, duration - 1) : position
+        playbackEngine.seek(to: target, exact: true)
+        currentTime = target
     }
 
     func resumeWatching(_ item: WatchHistoryItem) {
@@ -158,24 +191,73 @@ final class PlayerViewModel {
 
     func persistWatchProgress(force: Bool = false) {
         guard let url = currentURL else { return }
+        if !force {
+            guard pendingResumePosition == nil, hasRestoredPlaybackSettings else { return }
+        } else {
+            guard hasRestoredPlaybackSettings || pendingResumePosition != nil || currentTime > 1 else {
+                return
+            }
+        }
         let now = Date()
         if !force, now.timeIntervalSince(lastHistorySave) < 2 { return }
         lastHistorySave = now
-        watchHistory.upsert(url: url, position: currentTime, duration: duration)
+        watchHistory.upsert(
+            url: url,
+            position: pendingResumePosition ?? currentTime,
+            duration: duration,
+            settings: currentPlaybackSettings()
+        )
         continueWatching = watchHistory.unfinished()
     }
 
-    func refreshPlaybackState() {
-        let state = playbackEngine.state
-        if !isScrubbing {
-            currentTime = state.currentTime
-            duration = state.duration
-            isPlaying = state.isPlaying
+    func refreshPlaybackState(includingControls: Bool = false) {
+        let clock = playbackEngine.playbackClock()
+        if let pending = pendingResumePosition, pending > 1 {
+            duration = clock.duration
+            isPlaying = clock.isPlaying
+            let target = duration > 1 ? min(pending, duration - 1) : pending
+            if clock.time > 1, abs(clock.time - target) < 4 {
+                pendingResumePosition = nil
+                currentTime = clock.time
+            } else {
+                currentTime = target
+            }
+        } else if !isScrubbing {
+            let seekHasLanded = Date() >= skipFreezeUntil
+                || abs(clock.time - timeBeforeSkip) >= 1
+            if seekHasLanded {
+                currentTime = clock.time
+                duration = clock.duration
+                isPlaying = clock.isPlaying
+            }
         }
-        if !state.hasSameControls(as: playbackState) {
-            playbackState = state
+        if includingControls {
+            let state = playbackEngine.state
+            if !state.hasSameControls(as: playbackState) {
+                playbackState = state
+            }
         }
         persistWatchProgress()
+        syncNowPlayingAndSleep()
+    }
+
+    private func syncNowPlayingAndSleep() {
+        SleepPreventer.update(isPlaying: isPlaying && currentURL != nil)
+        guard let url = currentURL else { return }
+        let now = Date()
+        if lastNowPlayingIsPlaying == isPlaying, now.timeIntervalSince(lastNowPlayingSync) < 1 {
+            return
+        }
+        lastNowPlayingSync = now
+        lastNowPlayingIsPlaying = isPlaying
+        nowPlaying.update(
+            title: url.lastPathComponent,
+            time: currentTime,
+            duration: duration,
+            isPlaying: isPlaying,
+            rate: playbackState.playbackRate
+        )
+        pictureInPicture?.syncPlaying(isPlaying)
     }
 
     func togglePlayback() {
@@ -184,13 +266,41 @@ final class PlayerViewModel {
         } else {
             playbackEngine.play()
         }
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
         persistWatchProgress(force: true)
+    }
+
+    func playIfNeeded() {
+        guard !isPlaying else { return }
+        togglePlayback()
+    }
+
+    func pauseIfNeeded() {
+        guard isPlaying else { return }
+        togglePlayback()
+    }
+
+    func cycleABLoop() {
+        playbackEngine.cycleABLoop(at: currentTime)
+        loopA = playbackEngine.loopA
+        loopB = playbackEngine.loopB
+    }
+
+    func thumbnail(at time: TimeInterval) -> NSImage? {
+        thumbnails.image(at: time)
+    }
+
+    func togglePictureInPicture() {
+        pictureInPicture?.toggle()
+    }
+
+    func setPictureInPicture(_ active: Bool) {
+        isPictureInPicture = active
     }
 
     func seek(to time: TimeInterval) {
         playbackEngine.seek(to: time, exact: true)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func beginScrubbing() {
@@ -213,7 +323,7 @@ final class PlayerViewModel {
     func endScrubbing() {
         playbackEngine.seek(to: scrubTime, exact: true)
         isScrubbing = false
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
         playbackPositionDidJump()
         persistWatchProgress(force: true)
     }
@@ -223,19 +333,36 @@ final class PlayerViewModel {
     }
 
     func skip(by interval: TimeInterval) {
+        timeBeforeSkip = currentTime
+        let target = max(currentTime + interval, 0)
         playbackEngine.skip(by: interval)
-        refreshPlaybackState()
+        currentTime = duration > 0 ? min(target, duration) : target
+        skipFreezeUntil = Date().addingTimeInterval(0.08)
         restartProgressiveTranscriptionIfNeeded()
+    }
+
+    func nudgeVolume(by delta: Float) {
+        if delta > 0, playbackState.isMuted {
+            setMuted(false)
+        }
+        setVolume(min(max(playbackState.volume + delta, 0), 1))
+        volumeHUDPercent = Int((playbackState.volume * 100).rounded())
+        volumeHUDHideTask?.cancel()
+        volumeHUDHideTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            self?.volumeHUDPercent = nil
+        }
     }
 
     func setVolume(_ volume: Float) {
         playbackEngine.setVolume(volume)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setMuted(_ isMuted: Bool) {
         playbackEngine.setMuted(isMuted)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func toggleMuted() {
@@ -244,42 +371,42 @@ final class PlayerViewModel {
 
     func setPlaybackRate(_ rate: Float) {
         playbackEngine.setPlaybackRate(rate)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setVideoScalingMode(_ mode: VideoScalingMode) {
         playbackEngine.setVideoScalingMode(mode)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setAspectRatio(_ ratio: VideoRatio) {
         playbackEngine.setAspectRatio(ratio)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setCropRatio(_ ratio: VideoRatio) {
         playbackEngine.setCropRatio(ratio)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setRotation(_ rotation: VideoRotation) {
         playbackEngine.setRotation(rotation)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setHardwareDecoding(_ isEnabled: Bool) {
         playbackEngine.setHardwareDecoding(isEnabled)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setDeinterlacing(_ isEnabled: Bool) {
         playbackEngine.setDeinterlacing(isEnabled)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func setVideoEqualizer(_ equalizer: VideoEqualizer) {
         playbackEngine.setVideoEqualizer(equalizer)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     func refreshAudioTracks() {
@@ -289,11 +416,51 @@ final class PlayerViewModel {
     func selectAudioTrack(_ id: Int64) {
         playbackEngine.selectAudioTrack(id)
         refreshAudioTracks()
+        persistWatchProgress(force: true)
+    }
+
+    private func currentPlaybackSettings() -> VideoPlaybackSettings {
+        let track = audioTracks.first(where: \.isSelected)
+        return VideoPlaybackSettings(
+            audioTrackID: track?.id,
+            audioLanguage: track?.language,
+            volume: playbackState.volume,
+            isMuted: playbackState.isMuted,
+            playbackRate: playbackState.playbackRate,
+            audioDelay: playbackState.audioDelay,
+            videoScalingMode: playbackState.videoScalingMode,
+            aspectRatio: playbackState.aspectRatio,
+            cropRatio: playbackState.cropRatio,
+            rotation: playbackState.rotation,
+            hardwareDecoding: playbackState.hardwareDecoding,
+            deinterlacing: playbackState.deinterlacing,
+            videoEqualizer: playbackState.videoEqualizer
+        )
+    }
+
+    private func restorePlaybackSettingsIfNeeded() {
+        guard !hasRestoredPlaybackSettings, let url = currentURL else { return }
+        hasRestoredPlaybackSettings = true
+        guard let settings = watchHistory.item(for: url)?.settings else { return }
+        if let volume = settings.volume { setVolume(volume) }
+        if let isMuted = settings.isMuted { setMuted(isMuted) }
+        if let playbackRate = settings.playbackRate { setPlaybackRate(playbackRate) }
+        if let audioDelay = settings.audioDelay { setAudioDelay(audioDelay) }
+        if let videoScalingMode = settings.videoScalingMode { setVideoScalingMode(videoScalingMode) }
+        if let aspectRatio = settings.aspectRatio { setAspectRatio(aspectRatio) }
+        if let cropRatio = settings.cropRatio { setCropRatio(cropRatio) }
+        if let rotation = settings.rotation { setRotation(rotation) }
+        if let hardwareDecoding = settings.hardwareDecoding { setHardwareDecoding(hardwareDecoding) }
+        if let deinterlacing = settings.deinterlacing { setDeinterlacing(deinterlacing) }
+        if let videoEqualizer = settings.videoEqualizer { setVideoEqualizer(videoEqualizer) }
+        if let track = settings.matchingAudioTrack(in: audioTracks) {
+            selectAudioTrack(track.id)
+        }
     }
 
     func setAudioDelay(_ delay: TimeInterval) {
         playbackEngine.setAudioDelay(delay)
-        refreshPlaybackState()
+        refreshPlaybackState(includingControls: true)
     }
 
     var visibleSubtitleCues: [SubtitleCue] {
@@ -482,7 +649,12 @@ final class PlayerViewModel {
 
     private func restartProgressiveTranscriptionIfNeeded() {
         guard isProgressiveTranscriptionEnabled else { return }
-        restartProgressiveTranscription(at: currentTime)
+        transcriptionRestartTask?.cancel()
+        transcriptionRestartTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled, let self else { return }
+            self.restartProgressiveTranscription(at: self.currentTime)
+        }
     }
 
     private func restartProgressiveTranscription(at time: TimeInterval) {

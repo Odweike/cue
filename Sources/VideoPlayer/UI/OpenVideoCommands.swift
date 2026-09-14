@@ -50,6 +50,16 @@ struct PlaybackCommands: Commands {
                 viewModel.togglePlayback()
             }
             .disabled(viewModel.currentURL == nil)
+            Button("A–B Loop") {
+                viewModel.cycleABLoop()
+            }
+            .keyboardShortcut("l")
+            .disabled(viewModel.currentURL == nil)
+            Button(viewModel.isPictureInPicture ? "Exit Picture in Picture" : "Picture in Picture") {
+                viewModel.togglePictureInPicture()
+            }
+            .keyboardShortcut("p", modifiers: [.command, .control])
+            .disabled(viewModel.currentURL == nil)
         }
     }
 }

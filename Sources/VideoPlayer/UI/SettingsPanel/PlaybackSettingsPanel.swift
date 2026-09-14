@@ -106,16 +106,7 @@ struct PlaybackSettingsPanel: View {
     private var audioSettings: some View {
         Form {
             Section("Track") {
-                if viewModel.audioTracks.isEmpty {
-                    Text("No audio tracks available")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Picker("Audio Track", selection: selectedAudioTrack) {
-                        ForEach(viewModel.audioTracks) { track in
-                            Text(track.displayName).tag(track.id)
-                        }
-                    }
-                }
+                AudioTrackList(viewModel: viewModel, maxVisibleRows: 3)
             }
 
             Section("Output") {
@@ -234,22 +225,60 @@ struct PlaybackSettingsPanel: View {
         )
     }
 
-    private var selectedAudioTrack: Binding<Int64> {
-        Binding(
-            get: {
-                viewModel.audioTracks.first(where: \.isSelected)?.id
-                    ?? viewModel.audioTracks.first?.id
-                    ?? 0
-            },
-            set: { viewModel.selectAudioTrack($0) }
-        )
-    }
-
     private var audioDelay: Binding<Double> {
         Binding(
             get: { viewModel.playbackState.audioDelay },
             set: { viewModel.setAudioDelay($0) }
         )
+    }
+}
+
+private struct AudioTrackList: View {
+    let viewModel: PlayerViewModel
+    var maxVisibleRows = 3
+
+    private static let rowHeight: CGFloat = 22
+    private static let rowSpacing: CGFloat = 10
+
+    var body: some View {
+        if viewModel.audioTracks.isEmpty {
+            Text("No audio tracks available")
+                .foregroundStyle(.secondary)
+        } else if viewModel.audioTracks.count > maxVisibleRows {
+            ScrollView {
+                rows
+            }
+            .frame(height: Self.visibleHeight(rows: maxVisibleRows))
+        } else {
+            rows
+        }
+    }
+
+    private var rows: some View {
+        VStack(alignment: .leading, spacing: Self.rowSpacing) {
+            ForEach(viewModel.audioTracks) { track in
+                Button {
+                    viewModel.selectAudioTrack(track.id)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: track.isSelected ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(track.isSelected ? Color.accentColor : .secondary)
+                            .frame(width: 16)
+                        Text(track.displayName)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(height: Self.rowHeight)
+            }
+        }
+    }
+
+    private static func visibleHeight(rows: Int) -> CGFloat {
+        CGFloat(rows) * rowHeight + CGFloat(max(rows - 1, 0)) * rowSpacing
     }
 }
 
