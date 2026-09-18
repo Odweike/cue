@@ -46,6 +46,7 @@ final class VideoThumbnailCache: @unchecked Sendable {
         _ = MPV.setOption("osc", to: "no", on: ctx)
         _ = MPV.setOption("osd-level", to: "0", on: ctx)
         _ = MPV.setOption("hr-seek", to: "yes", on: ctx)
+        _ = MPV.setOption("keepaspect", to: "yes", on: ctx)
         guard mpv_initialize(ctx) >= 0 else { return }
 
         let api = UnsafeMutableRawPointer(mutating: (MPV_RENDER_API_TYPE_SW as NSString).utf8String)
@@ -62,8 +63,14 @@ final class VideoThumbnailCache: @unchecked Sendable {
         guard wait(ctx, for: MPV_EVENT_FILE_LOADED, timeout: 8) else { return }
 
         let count = min(24, max(8, Int(duration / 15)))
-        let width = 160
-        let height = 90
+        let videoWidth = int64("dwidth", on: ctx)
+        let videoHeight = int64("dheight", on: ctx)
+        let points = Self.pointSize(
+            videoWidth: videoWidth > 0 ? videoWidth : 16,
+            videoHeight: videoHeight > 0 ? videoHeight : 9
+        )
+        let width = max(2, Int(points.width) * 2)
+        let height = max(2, Int(points.height) * 2)
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         var size = [Int32(width), Int32(height)]
         var stride = Int32(width * 4)
@@ -92,7 +99,7 @@ final class VideoThumbnailCache: @unchecked Sendable {
                     }
                 }
             }
-            guard rendered, let image = nsImage(from: pixels, width: width, height: height) else { continue }
+            guard rendered, let image = nsImage(from: pixels, pixelWidth: width, pixelHeight: height, pointSize: points) else { continue }
             lock.lock()
             if generation == token {
                 thumbs.append((time, image))
@@ -117,32 +124,49 @@ final class VideoThumbnailCache: @unchecked Sendable {
         return false
     }
 
-    private func nsImage(from pixels: [UInt8], width: Int, height: Int) -> NSImage? {
+    private func nsImage(from pixels: [UInt8], pixelWidth: Int, pixelHeight: Int, pointSize: NSSize) -> NSImage? {
         guard let representation = NSBitmapImageRep(
             bitmapDataPlanes: nil,
-            pixelsWide: width,
-            pixelsHigh: height,
+            pixelsWide: pixelWidth,
+            pixelsHigh: pixelHeight,
             bitsPerSample: 8,
             samplesPerPixel: 4,
             hasAlpha: true,
             isPlanar: false,
             colorSpaceName: .deviceRGB,
-            bytesPerRow: width * 4,
+            bytesPerRow: pixelWidth * 4,
             bitsPerPixel: 32
         ), let dest = representation.bitmapData else { return nil }
 
-        for y in 0..<height {
-            for x in 0..<width {
-                let source = (y * width + x) * 4
-                let target = ((height - 1 - y) * width + x) * 4
-                dest[target] = pixels[source + 2]
-                dest[target + 1] = pixels[source + 1]
-                dest[target + 2] = pixels[source]
-                dest[target + 3] = 255
+        for y in 0..<pixelHeight {
+            for x in 0..<pixelWidth {
+                let i = (y * pixelWidth + x) * 4
+                dest[i] = pixels[i + 2]
+                dest[i + 1] = pixels[i + 1]
+                dest[i + 2] = pixels[i]
+                dest[i + 3] = 255
             }
         }
-        let image = NSImage(size: NSSize(width: width, height: height))
+        representation.size = pointSize
+        let image = NSImage(size: pointSize)
         image.addRepresentation(representation)
         return image
+    }
+
+    private func int64(_ name: String, on ctx: OpaquePointer) -> Int {
+        var value: Int64 = 0
+        guard mpv_get_property(ctx, name, MPV_FORMAT_INT64, &value) >= 0 else { return 0 }
+        return Int(value)
+    }
+
+    static func pointSize(videoWidth: Int, videoHeight: Int, maxEdge: CGFloat = 240) -> NSSize {
+        let width = max(videoWidth, 1)
+        let height = max(videoHeight, 1)
+        if width >= height {
+            let pointWidth = maxEdge
+            return NSSize(width: pointWidth, height: max(1, (pointWidth * CGFloat(height) / CGFloat(width)).rounded()))
+        }
+        let pointHeight = maxEdge
+        return NSSize(width: max(1, (pointHeight * CGFloat(width) / CGFloat(height)).rounded()), height: pointHeight)
     }
 }

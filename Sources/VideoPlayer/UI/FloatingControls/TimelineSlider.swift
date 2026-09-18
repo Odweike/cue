@@ -123,8 +123,23 @@ final class TimelineSliderView: NSSlider {
             image: thumbnail?(time),
             time: time,
             duration: maxValue,
-            at: screenPoint
+            at: screenPoint,
+            avoiding: controlBarScreenFrame()
         )
+    }
+
+    private func controlBarScreenFrame() -> NSRect {
+        var view: NSView = self
+        var bar: NSView = self
+        while let parent = view.superview {
+            if parent.bounds.height > 220 { break }
+            if parent.bounds.height >= bar.bounds.height {
+                bar = parent
+            }
+            view = parent
+        }
+        guard let window else { return .zero }
+        return window.convertToScreen(bar.convert(bar.bounds, to: nil))
     }
 }
 
@@ -133,8 +148,9 @@ private final class TimelinePreviewPanel: NSPanel {
     private let label = NSTextField(labelWithString: "")
 
     init() {
+        let size = TimelinePreviewPlacement.panelSize(for: TimelinePreviewPlacement.defaultImage)
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 168, height: 118),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: true
@@ -146,32 +162,57 @@ private final class TimelinePreviewPanel: NSPanel {
         ignoresMouseEvents = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let box = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 168, height: 118))
+        let box = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
         box.material = .hudWindow
         box.state = .active
         box.wantsLayer = true
         box.layer?.cornerRadius = 8
+        box.autoresizingMask = [.width, .height]
         contentView = box
 
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.wantsLayer = true
-        imageView.layer?.cornerRadius = 4
+        imageView.layer?.cornerRadius = 6
         imageView.layer?.masksToBounds = true
         label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
         label.textColor = .white
         label.alignment = .center
         box.addSubview(imageView)
         box.addSubview(label)
-        imageView.frame = NSRect(x: 8, y: 24, width: 152, height: 86)
-        label.frame = NSRect(x: 8, y: 4, width: 152, height: 16)
+        layout(imageSize: TimelinePreviewPlacement.defaultImage)
     }
 
-    func show(image: NSImage?, time: TimeInterval, duration: TimeInterval, at point: NSPoint) {
+    func show(image: NSImage?, time: TimeInterval, duration: TimeInterval, at point: NSPoint, avoiding bar: NSRect) {
         imageView.image = image
         let hours = duration >= 3_600
         label.stringValue = PlaybackTimeFormat.string(from: time, includingHours: hours)
-        setFrameOrigin(NSPoint(x: point.x - 84, y: point.y + 18))
+        let imageSize = image?.size ?? TimelinePreviewPlacement.defaultImage
+        let size = layout(imageSize: imageSize)
+        let screen = NSScreen.screens.first { $0.frame.intersects(bar) || $0.frame.contains(point) }?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(origin: .zero, size: size)
+        setFrame(
+            NSRect(
+                origin: TimelinePreviewPlacement.origin(cursorX: point.x, size: size, avoiding: bar, in: screen),
+                size: size
+            ),
+            display: true
+        )
         orderFrontRegardless()
+    }
+
+    @discardableResult
+    private func layout(imageSize: NSSize) -> NSSize {
+        let size = TimelinePreviewPlacement.panelSize(for: imageSize)
+        let pad = TimelinePreviewPlacement.padding
+        imageView.frame = NSRect(
+            x: pad,
+            y: TimelinePreviewPlacement.labelHeight,
+            width: imageSize.width,
+            height: imageSize.height
+        )
+        label.frame = NSRect(x: pad, y: 4, width: imageSize.width, height: 16)
+        return size
     }
 }
 
@@ -220,5 +261,30 @@ private final class TimelineSliderCell: NSSliderCell {
             let x = bar.minX + bar.width * CGFloat((chapter - minValue) / (maxValue - minValue))
             NSBezierPath(rect: NSRect(x: x, y: bar.minY - 2, width: 1, height: barHeight + 4)).fill()
         }
+    }
+}
+
+enum TimelinePreviewPlacement {
+    static let defaultImage = VideoThumbnailCache.pointSize(videoWidth: 16, videoHeight: 9)
+    static let padding: CGFloat = 8
+    static let labelHeight: CGFloat = 22
+    static let gap: CGFloat = 10
+    static let margin: CGFloat = 8
+
+    static func panelSize(for image: NSSize) -> NSSize {
+        NSSize(width: image.width + padding * 2, height: image.height + padding + labelHeight)
+    }
+
+    static func origin(cursorX: CGFloat, size: NSSize, avoiding bar: NSRect, in screen: NSRect) -> NSPoint {
+        let minX = screen.minX + margin
+        let maxX = screen.maxX - size.width - margin
+        let x = minX <= maxX
+            ? min(max(cursorX - size.width / 2, minX), maxX)
+            : screen.midX - size.width / 2
+        let above = bar.maxY + gap
+        let y = above + size.height <= screen.maxY - margin
+            ? above
+            : bar.minY - gap - size.height
+        return NSPoint(x: x, y: max(screen.minY + margin, y))
     }
 }

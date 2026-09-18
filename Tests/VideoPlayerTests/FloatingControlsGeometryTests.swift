@@ -78,4 +78,35 @@ final class FloatingControlsGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(origin.y, 0)
         XCTAssertLessThanOrEqual(origin.y + panelSize.height, availableSize.height - 16)
     }
+
+    func testTimelinePreviewSitsAboveTheControlBarWhenThereIsRoom() {
+        let screen = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        let bar = NSRect(x: 400, y: 40, width: 620, height: 132)
+        let size = TimelinePreviewPlacement.panelSize(for: TimelinePreviewPlacement.defaultImage)
+        let origin = TimelinePreviewPlacement.origin(cursorX: 700, size: size, avoiding: bar, in: screen)
+        let preview = NSRect(origin: origin, size: size)
+
+        XCTAssertEqual(origin.y, bar.maxY + TimelinePreviewPlacement.gap)
+        XCTAssertFalse(preview.intersects(bar))
+        XCTAssertEqual(origin.x, 700 - size.width / 2)
+    }
+
+    func testTimelinePreviewMovesBelowWhenTheBarIsAtTheTop() {
+        let screen = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        let bar = NSRect(x: 400, y: 760, width: 620, height: 132)
+        let size = TimelinePreviewPlacement.panelSize(for: TimelinePreviewPlacement.defaultImage)
+        let origin = TimelinePreviewPlacement.origin(cursorX: 700, size: size, avoiding: bar, in: screen)
+        let preview = NSRect(origin: origin, size: size)
+
+        XCTAssertEqual(origin.y, bar.minY - TimelinePreviewPlacement.gap - size.height)
+        XCTAssertFalse(preview.intersects(bar))
+        XCTAssertGreaterThanOrEqual(origin.y, screen.minY)
+    }
+
+    func testTimelineThumbnailKeepsVideoAspectAndGrowsPastTheOld160By90Box() {
+        XCTAssertEqual(VideoThumbnailCache.pointSize(videoWidth: 1_920, videoHeight: 1_080), NSSize(width: 240, height: 135))
+        XCTAssertEqual(VideoThumbnailCache.pointSize(videoWidth: 1_920, videoHeight: 800), NSSize(width: 240, height: 100))
+        XCTAssertEqual(VideoThumbnailCache.pointSize(videoWidth: 1_080, videoHeight: 1_920), NSSize(width: 135, height: 240))
+        XCTAssertGreaterThan(TimelinePreviewPlacement.panelSize(for: TimelinePreviewPlacement.defaultImage).width, 168)
+    }
 }
