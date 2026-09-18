@@ -57,6 +57,7 @@ final class PlayerViewModelTests: XCTestCase {
         viewModel.setDeinterlacing(true)
         viewModel.setVideoEqualizer(VideoEqualizer(brightness: 10, contrast: -5))
         viewModel.setAudioDelay(0.4)
+        viewModel.setSubtitleDelay(-0.3)
         viewModel.seek(to: 42)
         viewModel.skip(by: 10)
 
@@ -71,6 +72,7 @@ final class PlayerViewModelTests: XCTestCase {
         XCTAssertEqual(engine.deinterlacing, true)
         XCTAssertEqual(engine.videoEqualizer, VideoEqualizer(brightness: 10, contrast: -5))
         XCTAssertEqual(engine.audioDelay, 0.4)
+        XCTAssertEqual(engine.subtitleDelay, -0.3)
         XCTAssertEqual(engine.seekTime, 42)
         XCTAssertEqual(engine.skipInterval, 10)
         XCTAssertEqual(viewModel.currentTime, 10)
@@ -238,9 +240,12 @@ final class PlayerViewModelTests: XCTestCase {
             userDefaults: userDefaults
         )
 
-        XCTAssertEqual(viewModel.subtitleStyles, [first, second])
+        XCTAssertEqual(viewModel.subtitleStyles[0], first)
+        XCTAssertEqual(viewModel.subtitleStyles[1], second)
+        XCTAssertEqual(viewModel.subtitleStyles[2], SubtitleStyle.tertiary)
         XCTAssertEqual(restored.subtitleStyleProfiles.first?.name, "Cinema")
-        XCTAssertEqual(restored.subtitleStyleProfiles.first?.styles, [first, second])
+        XCTAssertEqual(restored.subtitleStyleProfiles.first?.styles[0], first)
+        XCTAssertEqual(restored.subtitleStyleProfiles.first?.styles[1], second)
     }
 
     func testFileReadyResumesPendingPosition() {
@@ -271,6 +276,87 @@ final class PlayerViewModelTests: XCTestCase {
 
         XCTAssertEqual(engine.seekTime, 80)
         XCTAssertEqual(store.item(for: video)?.position, 80)
+    }
+
+    func testEmbeddedSubtitlesUseMpvTracksIncludingBitmapCodecs() {
+        let engine = PlaybackEngineSpy()
+        engine.availableSubtitleStreams = [
+            SubtitleStream(
+                id: 1,
+                title: "Full",
+                language: "und",
+                codec: "subrip",
+                isForced: false,
+                isDefault: true
+            ),
+            SubtitleStream(
+                id: 2,
+                title: "Signs",
+                language: "und",
+                codec: "hdmv_pgs",
+                isForced: false,
+                isDefault: false
+            )
+        ]
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        viewModel.open(URL(fileURLWithPath: "/tmp/movie.mkv"))
+        engine.eventHandler?(.fileReady)
+
+        XCTAssertEqual(viewModel.subtitleTracks.map(\.mpvID), [1, 2])
+        XCTAssertTrue(viewModel.subtitleTracks[0].name.contains("Full"))
+        XCTAssertTrue(viewModel.subtitleTracks[1].name.contains("Signs"))
+        XCTAssertEqual(engine.selectedSubtitleIDs?.primary, 1)
+        XCTAssertNil(engine.selectedSubtitleIDs?.secondary)
+
+        engine.eventHandler?(.tracksChanged)
+        XCTAssertEqual(viewModel.subtitleTracks.count, 2)
+    }
+
+    func testSubtitleDelayShiftsOverlayCues() throws {
+        let engine = PlaybackEngineSpy()
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        let srt = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cue-delay-\(UUID().uuidString).srt")
+        try "1\n00:00:10,000 --> 00:00:12,000\nHello\n".write(to: srt, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: srt) }
+
+        viewModel.open(URL(fileURLWithPath: "/tmp/movie.mkv"))
+        try viewModel.importSubtitles(srt)
+        engine.state.currentTime = 10.2
+        viewModel.setSubtitleDelay(0)
+        XCTAssertEqual(viewModel.visibleSubtitleCues.first?.text, "Hello")
+
+        viewModel.setSubtitleDelay(0.5)
+        XCTAssertTrue(viewModel.visibleSubtitleCues.isEmpty)
+
+        engine.state.currentTime = 10.6
+        viewModel.setSubtitleDelay(0.5)
+        XCTAssertEqual(viewModel.visibleSubtitleCues.first?.text, "Hello")
+    }
+
+    func testEnablingSubtitleTracksCapsAtThree() {
+        let engine = PlaybackEngineSpy()
+        engine.availableSubtitleStreams = (1...4).map { id in
+            SubtitleStream(
+                id: Int64(id),
+                title: "T\(id)",
+                language: "und",
+                codec: "subrip",
+                isForced: false,
+                isDefault: id == 1
+            )
+        }
+        let viewModel = PlayerViewModel(playbackEngine: engine)
+        viewModel.open(URL(fileURLWithPath: "/tmp/movie.mkv"))
+        engine.eventHandler?(.fileReady)
+
+        viewModel.setSubtitleTrack(viewModel.subtitleTracks[1].id, enabled: true)
+        viewModel.setSubtitleTrack(viewModel.subtitleTracks[2].id, enabled: true)
+        viewModel.setSubtitleTrack(viewModel.subtitleTracks[3].id, enabled: true)
+
+        XCTAssertEqual(viewModel.subtitleTracks.filter(\.isEnabled).map(\.mpvID), [1, 2, 3])
+        XCTAssertEqual(engine.selectedSubtitleIDs?.primary, 1)
+        XCTAssertEqual(engine.selectedSubtitleIDs?.secondary, 2)
     }
 
     func testFailedToOpenReturnsToWelcomeWithError() {
@@ -388,8 +474,11 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     private(set) var deinterlacing: Bool?
     private(set) var videoEqualizer: VideoEqualizer?
     var availableAudioTracks: [AudioTrack] = []
+    var availableSubtitleStreams: [SubtitleStream] = []
     private(set) var selectedAudioTrackID: Int64?
+    private(set) var selectedSubtitleIDs: (primary: Int64?, secondary: Int64?)?
     private(set) var audioDelay: TimeInterval?
+    private(set) var subtitleDelay: TimeInterval?
     private(set) var seekTime: TimeInterval?
     private(set) var seekExact: Bool?
     private(set) var skipInterval: TimeInterval?
@@ -469,7 +558,11 @@ private final class PlaybackEngineSpy: PlaybackEngine {
     }
 
     func subtitleStreams() -> [SubtitleStream] {
-        []
+        availableSubtitleStreams
+    }
+
+    func selectSubtitleTracks(primary: Int64?, secondary: Int64?, primaryTop: Bool, secondaryTop: Bool) {
+        selectedSubtitleIDs = (primary, secondary)
     }
 
     func selectAudioTrack(_ id: Int64) {
@@ -478,6 +571,12 @@ private final class PlaybackEngineSpy: PlaybackEngine {
 
     func setAudioDelay(_ delay: TimeInterval) {
         audioDelay = delay
+        state.audioDelay = delay
+    }
+
+    func setSubtitleDelay(_ delay: TimeInterval) {
+        subtitleDelay = delay
+        state.subtitleDelay = delay
     }
 
     func chapters() -> [PlaybackChapter] {

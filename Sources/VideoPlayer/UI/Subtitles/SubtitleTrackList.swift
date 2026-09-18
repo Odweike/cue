@@ -7,7 +7,7 @@ struct SubtitleTrackList: View {
     @State private var errorMessage: String?
 
     private static let rowHeight: CGFloat = 22
-    private static let rowSpacing: CGFloat = 12
+    private static let rowSpacing: CGFloat = 10
 
     init(viewModel: PlayerViewModel, maxVisibleRows: Int? = nil) {
         self.viewModel = viewModel
@@ -52,34 +52,27 @@ struct SubtitleTrackList: View {
     private var rows: some View {
         VStack(alignment: .leading, spacing: Self.rowSpacing) {
             ForEach(viewModel.subtitleTracks) { track in
-                HStack {
-                    Toggle(track.name, isOn: Binding(
-                        get: { track.isEnabled },
-                        set: { viewModel.setSubtitleTrack(track.id, enabled: $0) }
-                    ))
-                    .lineLimit(1)
-
-                    Spacer(minLength: 8)
-
-                    Button {
-                        do {
-                            _ = try SubtitleFilePicker.exportSRT(track)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
+                Button {
+                    viewModel.setSubtitleTrack(track.id, enabled: !track.isEnabled)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: track.isEnabled ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(track.isEnabled ? Color.accentColor : .secondary)
+                            .frame(width: 16)
+                        Text(track.name)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
-                    .help("Export as SRT")
-                    .accessibilityLabel("Export \(track.name) as SRT")
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .frame(height: Self.rowHeight)
             }
         }
     }
 
     private static func visibleHeight(rows: Int) -> CGFloat {
-        CGFloat(rows) * rowHeight + CGFloat(rows - 1) * rowSpacing
+        CGFloat(rows) * rowHeight + CGFloat(max(rows - 1, 0)) * rowSpacing
     }
 }

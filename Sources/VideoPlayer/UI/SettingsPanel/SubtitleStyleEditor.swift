@@ -11,6 +11,25 @@ struct SubtitleStyleEditor: View {
                 SubtitleTrackList(viewModel: viewModel)
             }
 
+            Section("Synchronization") {
+                HStack(alignment: .center) {
+                    Text("Delay")
+                    RulerSlider(
+                        value: subtitleDelay,
+                        range: -5...5,
+                        step: 0.1,
+                        labels: [(-5, "−5 s"), (0, "0"), (5, "+5 s")]
+                    )
+                    Text(String(format: "%+.1f s", viewModel.playbackState.subtitleDelay))
+                        .monospacedDigit()
+                        .frame(width: 54, alignment: .trailing)
+                }
+
+                Button("Reset Delay") {
+                    viewModel.setSubtitleDelay(0)
+                }
+            }
+
             Section("Generate Subtitles") {
                 if viewModel.supportedTranscriptionLocales.isEmpty {
                     HStack {
@@ -73,6 +92,7 @@ struct SubtitleStyleEditor: View {
             Picker("Track style", selection: $selectedTrack) {
                 Text("First").tag(0)
                 Text("Second").tag(1)
+                Text("Third").tag(2)
             }
             .pickerStyle(.segmented)
 
@@ -222,6 +242,13 @@ struct SubtitleStyleEditor: View {
         Binding(
             get: { viewModel.selectedTranscriptionLocaleIdentifier },
             set: { viewModel.selectTranscriptionLocale($0) }
+        )
+    }
+
+    private var subtitleDelay: Binding<Double> {
+        Binding(
+            get: { viewModel.playbackState.subtitleDelay },
+            set: { viewModel.setSubtitleDelay($0) }
         )
     }
 

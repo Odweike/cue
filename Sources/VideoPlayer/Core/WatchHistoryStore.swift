@@ -17,6 +17,7 @@ struct VideoPlaybackSettings: Codable, Equatable, Sendable {
     var isMuted: Bool?
     var playbackRate: Float?
     var audioDelay: TimeInterval?
+    var subtitleDelay: TimeInterval?
     var videoScalingMode: VideoScalingMode?
     var aspectRatio: VideoRatio?
     var cropRatio: VideoRatio?

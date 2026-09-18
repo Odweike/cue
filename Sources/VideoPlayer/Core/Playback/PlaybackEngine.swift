@@ -52,6 +52,7 @@ struct PlaybackState: Equatable, Sendable {
     var deinterlacing = false
     var videoEqualizer = VideoEqualizer()
     var audioDelay: TimeInterval = 0
+    var subtitleDelay: TimeInterval = 0
 
     func hasSameControls(as other: PlaybackState) -> Bool {
         volume == other.volume
@@ -65,6 +66,7 @@ struct PlaybackState: Equatable, Sendable {
             && deinterlacing == other.deinterlacing
             && videoEqualizer == other.videoEqualizer
             && audioDelay == other.audioDelay
+            && subtitleDelay == other.subtitleDelay
     }
 }
 
@@ -76,6 +78,7 @@ struct PlaybackChapter: Equatable, Sendable, Identifiable {
 
 enum PlaybackEngineEvent: Sendable {
     case fileReady
+    case tracksChanged
     case failedToOpen(String)
 }
 
@@ -106,8 +109,10 @@ protocol PlaybackEngine: AnyObject {
     func setVideoEqualizer(_ equalizer: VideoEqualizer)
     func audioTracks() -> [AudioTrack]
     func subtitleStreams() -> [SubtitleStream]
+    func selectSubtitleTracks(primary: Int64?, secondary: Int64?, primaryTop: Bool, secondaryTop: Bool)
     func selectAudioTrack(_ id: Int64)
     func setAudioDelay(_ delay: TimeInterval)
+    func setSubtitleDelay(_ delay: TimeInterval)
     func chapters() -> [PlaybackChapter]
     func cycleABLoop(at time: TimeInterval)
     func clearABLoop()

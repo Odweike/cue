@@ -114,15 +114,35 @@ struct SubtitleStyle: Codable, Equatable, Sendable {
         fontSize: 28,
         textColor: .white,
         backgroundOpacity: 0.72,
-        verticalOffset: 180
+        position: .bottom,
+        verticalOffset: 60
     )
 
     static let secondary = SubtitleStyle(
         fontSize: 24,
         textColor: .yellow,
         backgroundOpacity: 0.64,
-        verticalOffset: 235
+        position: .bottom,
+        verticalOffset: 112
     )
+
+    static let tertiary = SubtitleStyle(
+        fontSize: 22,
+        textColor: .cyan,
+        backgroundOpacity: 0.56,
+        position: .bottom,
+        verticalOffset: 164
+    )
+
+    static let defaults = [primary, secondary, tertiary]
+
+    static func padded(_ styles: [SubtitleStyle]) -> [SubtitleStyle] {
+        var result = styles.map { $0.normalized() }
+        while result.count < defaults.count {
+            result.append(defaults[result.count])
+        }
+        return Array(result.prefix(defaults.count))
+    }
 
     func normalized() -> SubtitleStyle {
         var style = self

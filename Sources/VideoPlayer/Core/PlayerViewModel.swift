@@ -5,13 +5,13 @@ import Observation
 @MainActor
 @Observable
 final class PlayerViewModel {
+    private static let maxEnabledSubtitleTracks = 3
     private static let subtitleStylesKey = "SubtitleStyles"
     private static let subtitleStyleProfilesKey = "SubtitleStyleProfiles"
     private static let transcriptionLocaleKey = "TranscriptionLocale"
 
     let playbackEngine: any PlaybackEngine
     private var transcriptionEngine: any TranscriptionEngine
-    private let subtitleExtractor = SubtitleExtractor()
     private let userDefaults: UserDefaults
     private var transcriptionTask: Task<Void, Never>?
     private var transcriptionID: UUID?
@@ -21,7 +21,6 @@ final class PlayerViewModel {
     private var accessedFileURL: URL?
     private var mediaLoadID = UUID()
     private var subtitleLoadTask: Task<Void, Never>?
-    private var embeddedSubtitleTasks: [Task<Void, Never>] = []
     private var embeddedSubtitlesLoadedID: UUID?
     private var pendingResumePosition: TimeInterval?
     private let watchHistory: WatchHistoryStore
@@ -118,8 +117,6 @@ final class PlayerViewModel {
         setProgressiveTranscriptionEnabled(false)
         subtitleLoadTask?.cancel()
         subtitleLoadTask = nil
-        embeddedSubtitleTasks.forEach { $0.cancel() }
-        embeddedSubtitleTasks.removeAll()
         embeddedSubtitlesLoadedID = nil
         pendingResumePosition = nil
         subtitleTracks.removeAll()
@@ -153,6 +150,9 @@ final class PlayerViewModel {
                 nowPlaying.start(title: url.lastPathComponent)
                 thumbnails.prepare(url: url, duration: duration)
             }
+        case .tracksChanged:
+            refreshAudioTracks()
+            loadEmbeddedSubtitleStreams()
         case .failedToOpen(let message):
             if let failedURL = currentURL {
                 watchHistory.remove(failedURL.path)
@@ -428,6 +428,7 @@ final class PlayerViewModel {
             isMuted: playbackState.isMuted,
             playbackRate: playbackState.playbackRate,
             audioDelay: playbackState.audioDelay,
+            subtitleDelay: playbackState.subtitleDelay,
             videoScalingMode: playbackState.videoScalingMode,
             aspectRatio: playbackState.aspectRatio,
             cropRatio: playbackState.cropRatio,
@@ -446,6 +447,7 @@ final class PlayerViewModel {
         if let isMuted = settings.isMuted { setMuted(isMuted) }
         if let playbackRate = settings.playbackRate { setPlaybackRate(playbackRate) }
         if let audioDelay = settings.audioDelay { setAudioDelay(audioDelay) }
+        if let subtitleDelay = settings.subtitleDelay { setSubtitleDelay(subtitleDelay) }
         if let videoScalingMode = settings.videoScalingMode { setVideoScalingMode(videoScalingMode) }
         if let aspectRatio = settings.aspectRatio { setAspectRatio(aspectRatio) }
         if let cropRatio = settings.cropRatio { setCropRatio(cropRatio) }
@@ -463,8 +465,13 @@ final class PlayerViewModel {
         refreshPlaybackState(includingControls: true)
     }
 
+    func setSubtitleDelay(_ delay: TimeInterval) {
+        playbackEngine.setSubtitleDelay(delay)
+        refreshPlaybackState(includingControls: true)
+    }
+
     var visibleSubtitleCues: [SubtitleCue] {
-        let time = isScrubbing ? scrubTime : currentTime
+        let time = (isScrubbing ? scrubTime : currentTime) - playbackState.subtitleDelay
         return subtitleTracks
             .filter(\.isEnabled)
             .flatMap(\.cues)
@@ -485,8 +492,9 @@ final class PlayerViewModel {
 
     func setSubtitleTrack(_ trackID: UUID, enabled: Bool) {
         guard let index = subtitleTracks.firstIndex(where: { $0.id == trackID }) else { return }
-        if enabled, subtitleTracks.filter(\.isEnabled).count >= 2 { return }
+        if enabled, subtitleTracks.filter(\.isEnabled).count >= Self.maxEnabledSubtitleTracks { return }
         subtitleTracks[index].isEnabled = enabled
+        syncMpvSubtitles()
     }
 
     func subtitleStyle(for trackID: UUID) -> SubtitleStyle {
@@ -494,19 +502,28 @@ final class PlayerViewModel {
         guard let index = enabledTracks.firstIndex(where: { $0.id == trackID }) else {
             return .primary
         }
-        return subtitleStyles[min(index, subtitleStyles.count - 1)]
+        var style = subtitleStyles[min(index, subtitleStyles.count - 1)]
+        if style.position != .custom {
+            let stack = enabledTracks.enumerated().prefix(index).reduce(0) { count, item in
+                let other = subtitleStyles[min(item.offset, subtitleStyles.count - 1)]
+                let sameEdge = (style.position == .top) == (other.position == .top)
+                return count + (sameEdge ? 1 : 0)
+            }
+            style.verticalOffset = 60 + Double(stack) * 52
+        }
+        return style
     }
 
     func setSubtitleStyle(_ style: SubtitleStyle, at index: Int) {
         guard subtitleStyles.indices.contains(index) else { return }
         subtitleStyles[index] = style.normalized()
         saveSubtitleStyles()
+        syncMpvSubtitles()
     }
 
     func resetSubtitleStyle(at index: Int) {
-        let defaults: [SubtitleStyle] = [.primary, .secondary]
-        guard defaults.indices.contains(index) else { return }
-        setSubtitleStyle(defaults[index], at: index)
+        guard SubtitleStyle.defaults.indices.contains(index) else { return }
+        setSubtitleStyle(SubtitleStyle.defaults[index], at: index)
     }
 
     @discardableResult
@@ -529,9 +546,10 @@ final class PlayerViewModel {
 
     func applySubtitleStyleProfile(_ id: UUID) {
         guard let profile = subtitleStyleProfiles.first(where: { $0.id == id }),
-              profile.styles.count == 2 else { return }
-        subtitleStyles = profile.styles.map { $0.normalized() }
+              profile.styles.count >= 2 else { return }
+        subtitleStyles = SubtitleStyle.padded(profile.styles)
         saveSubtitleStyles()
+        syncMpvSubtitles()
     }
 
     func deleteSubtitleStyleProfile(_ id: UUID) {
@@ -596,7 +614,7 @@ final class PlayerViewModel {
                     locale: locale
                 )
                 guard let self, transcriptionID == operationID else { return }
-                let isEnabled = subtitleTracks.filter(\.isEnabled).count < 2
+                let isEnabled = subtitleTracks.filter(\.isEnabled).count < Self.maxEnabledSubtitleTracks
                 subtitleTracks.append(
                     SubtitleTrack(
                         id: trackID,
@@ -675,7 +693,7 @@ final class PlayerViewModel {
                     id: trackID,
                     name: "Live • \(localeName(locale))",
                     cues: [],
-                    isEnabled: subtitleTracks.filter(\.isEnabled).count < 2
+                    isEnabled: subtitleTracks.filter(\.isEnabled).count < Self.maxEnabledSubtitleTracks
                 )
             )
         }
@@ -766,32 +784,39 @@ final class PlayerViewModel {
     }
 
     private func loadEmbeddedSubtitleStreams() {
-        guard let fileURL = currentURL, embeddedSubtitlesLoadedID != mediaLoadID else { return }
-        let streams = playbackEngine.subtitleStreams().filter(\.isTextCodec)
+        guard embeddedSubtitlesLoadedID != mediaLoadID else { return }
+        let streams = playbackEngine.subtitleStreams()
         guard !streams.isEmpty else { return }
-
-        let loadID = mediaLoadID
-        let sidecarTask = subtitleLoadTask
-        embeddedSubtitlesLoadedID = loadID
-
+        embeddedSubtitlesLoadedID = mediaLoadID
         for stream in streams {
-            let task = Task { [weak self, subtitleExtractor] in
-                await sidecarTask?.value
-                do {
-                    let contents = try await subtitleExtractor.extract(from: fileURL, stream: stream)
-                    guard let self, !Task.isCancelled, self.mediaLoadID == loadID else { return }
-                    try appendSubtitleTrack(
-                        name: stream.displayName,
-                        contents: contents,
-                        fileExtension: stream.fileExtension,
-                        autoEnable: shouldAutoEnable(stream)
-                    )
-                } catch {
-                    return
-                }
-            }
-            embeddedSubtitleTasks.append(task)
+            let isEnabled = shouldAutoEnable(stream) && subtitleTracks.filter(\.isEnabled).count < Self.maxEnabledSubtitleTracks
+            subtitleTracks.append(
+                SubtitleTrack(
+                    id: UUID(),
+                    name: stream.displayName,
+                    cues: [],
+                    isEnabled: isEnabled,
+                    mpvID: stream.id
+                )
+            )
         }
+        syncMpvSubtitles()
+    }
+
+    private func syncMpvSubtitles() {
+        // ponytail: mpv only has sid + secondary-sid, so the 3rd enabled track
+        // renders in the overlay when it has cues.
+        let enabled = subtitleTracks.filter(\.isEnabled)
+        let mpv = enabled.compactMap { track -> (Int64, SubtitleStyle)? in
+            guard let id = track.mpvID else { return nil }
+            return (id, subtitleStyle(for: track.id))
+        }
+        playbackEngine.selectSubtitleTracks(
+            primary: mpv.first?.0,
+            secondary: mpv.dropFirst().first?.0,
+            primaryTop: mpv.first?.1.position == .top,
+            secondaryTop: mpv.dropFirst().first?.1.position == .top
+        )
     }
 
     private func shouldAutoEnable(_ stream: SubtitleStream) -> Bool {
@@ -812,7 +837,7 @@ final class PlayerViewModel {
     ) throws -> Bool {
         let trackID = UUID()
         let cues = try SubtitleParser.parse(contents, fileExtension: fileExtension, trackID: trackID)
-        let isEnabled = autoEnable && subtitleTracks.filter(\.isEnabled).count < 2
+        let isEnabled = autoEnable && subtitleTracks.filter(\.isEnabled).count < Self.maxEnabledSubtitleTracks
         subtitleTracks.append(
             SubtitleTrack(id: trackID, name: name, cues: cues, isEnabled: isEnabled)
         )
@@ -822,10 +847,10 @@ final class PlayerViewModel {
     private static func loadSubtitleStyles(from userDefaults: UserDefaults) -> [SubtitleStyle] {
         guard let data = userDefaults.data(forKey: subtitleStylesKey),
               let styles = try? JSONDecoder().decode([SubtitleStyle].self, from: data),
-              styles.count == 2 else {
-            return [.primary, .secondary]
+              styles.count >= 2 else {
+            return SubtitleStyle.defaults
         }
-        return styles.map { $0.normalized() }
+        return SubtitleStyle.padded(styles)
     }
 
     private func saveSubtitleStyles() {
@@ -838,7 +863,12 @@ final class PlayerViewModel {
               let profiles = try? JSONDecoder().decode([SubtitleStyleProfile].self, from: data) else {
             return []
         }
-        return profiles.filter { $0.styles.count == 2 }
+        return profiles.compactMap { profile in
+            guard profile.styles.count >= 2 else { return nil }
+            var profile = profile
+            profile.styles = SubtitleStyle.padded(profile.styles)
+            return profile
+        }
     }
 
     private func saveSubtitleStyleProfiles() {

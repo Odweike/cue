@@ -5,4 +5,5 @@ struct SubtitleTrack: Identifiable, Hashable, Sendable {
     let name: String
     var cues: [SubtitleCue]
     var isEnabled: Bool
+    var mpvID: Int64? = nil
 }

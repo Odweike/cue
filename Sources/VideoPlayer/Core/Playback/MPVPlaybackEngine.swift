@@ -16,6 +16,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
     private var deinterlacing = false
     private var videoEqualizer = VideoEqualizer()
     private var audioDelay: TimeInterval = 0
+    private var subtitleDelay: TimeInterval = 0
     private(set) var loopA: TimeInterval?
     private(set) var loopB: TimeInterval?
 
@@ -38,7 +39,8 @@ final class MPVPlaybackEngine: PlaybackEngine {
             hardwareDecoding: hardwareDecoding,
             deinterlacing: deinterlacing,
             videoEqualizer: videoEqualizer,
-            audioDelay: audioDelay
+            audioDelay: audioDelay,
+            subtitleDelay: subtitleDelay
         )
     }
 
@@ -67,11 +69,15 @@ final class MPVPlaybackEngine: PlaybackEngine {
         setOption("hr-seek", to: "no")
         setOption("hr-seek-framedrop", to: "yes")
         setOption("sid", to: "no")
-        setOption("sub-visibility", to: "no")
+        setOption("secondary-sid", to: "no")
+        setOption("sub-auto", to: "no")
+        setOption("sub-visibility", to: "yes")
+        setOption("secondary-sub-visibility", to: "yes")
 
         let status = mpv_initialize(context)
         precondition(status >= 0, "Could not initialize mpv: \(MPV.errorMessage(for: status))")
         playerView.attach(to: context)
+        mpv_observe_property(context, 0, "track-list", MPV_FORMAT_NONE)
 
         eventDrainer.eventSink = { [weak self] event in
             DispatchQueue.main.async {
@@ -90,6 +96,8 @@ final class MPVPlaybackEngine: PlaybackEngine {
         switch event {
         case .fileReady:
             eventHandler?(.fileReady)
+        case .tracksChanged:
+            eventHandler?(.tracksChanged)
         case .endFile(let error) where error < 0:
             eventHandler?(.failedToOpen(MPV.errorMessage(for: error)))
         case .endFile:
@@ -106,6 +114,8 @@ final class MPVPlaybackEngine: PlaybackEngine {
     func open(_ url: URL) {
         currentURL = url
         clearABLoop()
+        selectSubtitleTracks(primary: nil, secondary: nil, primaryTop: false, secondaryTop: false)
+        setSubtitleDelay(0)
         command("loadfile", url.path(percentEncoded: false), "replace")
         play()
     }
@@ -216,15 +226,12 @@ final class MPVPlaybackEngine: PlaybackEngine {
 
     func subtitleStreams() -> [SubtitleStream] {
         let count = max(int64Property("track-list/count"), 0)
-        var subtitleOrdinal = 0
         return (0..<count).compactMap { index in
             let prefix = "track-list/\(index)"
             guard stringProperty("\(prefix)/type") == "sub" else { return nil }
-            defer { subtitleOrdinal += 1 }
             let title = stringProperty("\(prefix)/title")
             return SubtitleStream(
                 id: int64Property("\(prefix)/id"),
-                ffmpegMap: "0:s:\(subtitleOrdinal)",
                 title: title,
                 language: stringProperty("\(prefix)/lang"),
                 codec: stringProperty("\(prefix)/codec"),
@@ -235,6 +242,24 @@ final class MPVPlaybackEngine: PlaybackEngine {
         }
     }
 
+    func selectSubtitleTracks(primary: Int64?, secondary: Int64?, primaryTop: Bool, secondaryTop: Bool) {
+        let ids = [primary, secondary].compactMap { $0 }
+        setString("sid", to: ids.first.map(String.init) ?? "no")
+        setString("secondary-sid", to: ids.dropFirst().first.map(String.init) ?? "no")
+        setFlag("sub-visibility", to: !ids.isEmpty)
+        setFlag("secondary-sub-visibility", to: ids.count > 1)
+        setDouble("sub-pos", to: primaryTop ? 10 : 100)
+        if ids.count > 1 {
+            if primaryTop, secondaryTop {
+                setDouble("secondary-sub-pos", to: 24)
+            } else if !primaryTop, !secondaryTop {
+                setDouble("secondary-sub-pos", to: 86)
+            } else {
+                setDouble("secondary-sub-pos", to: secondaryTop ? 10 : 100)
+            }
+        }
+    }
+
     func selectAudioTrack(_ id: Int64) {
         setInt64("aid", to: id)
     }
@@ -242,6 +267,12 @@ final class MPVPlaybackEngine: PlaybackEngine {
     func setAudioDelay(_ delay: TimeInterval) {
         audioDelay = min(max(delay, -5), 5)
         setDouble("audio-delay", to: audioDelay)
+    }
+
+    func setSubtitleDelay(_ delay: TimeInterval) {
+        subtitleDelay = min(max(delay, -5), 5)
+        setDouble("sub-delay", to: subtitleDelay)
+        setDouble("secondary-sub-delay", to: subtitleDelay)
     }
 
     func chapters() -> [PlaybackChapter] {
@@ -334,6 +365,7 @@ final class MPVPlaybackEngine: PlaybackEngine {
 
 private enum MPVDrainerEvent: Sendable {
     case fileReady
+    case tracksChanged
     case endFile(error: Int32)
 }
 
@@ -366,6 +398,11 @@ private final class MPVEventDrainer: @unchecked Sendable {
         switch event.event_id {
         case MPV_EVENT_FILE_LOADED:
             eventSink?(.fileReady)
+        case MPV_EVENT_PROPERTY_CHANGE:
+            guard let property = event.data?.assumingMemoryBound(to: mpv_event_property.self),
+                  let name = property.pointee.name,
+                  String(cString: name) == "track-list" else { return }
+            eventSink?(.tracksChanged)
         case MPV_EVENT_END_FILE:
             let error = event.data?
                 .assumingMemoryBound(to: mpv_event_end_file.self)

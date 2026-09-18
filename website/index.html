@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cue — macOS video player with on-device subtitles</title>
-  <meta name="description" content="Cue is a native macOS video player for MKV, MP4, and MOV. Generate time-coded subtitles on your Mac with Apple Speech, import SRT/VTT/ASS, and play locally. Free DMG for macOS 26+." />
+  <title>Cue — MKV player for Mac with on-device SRT</title>
+  <meta name="description" content="Generate timed SRT subtitles while you watch MKV, MP4, or MOV — fully offline on your Mac. Import SRT/VTT/ASS. A free open-source IINA/VLC alternative. macOS 26+." />
   <meta name="robots" content="index,follow" />
-  <meta name="keywords" content="Cue, macOS video player, MKV player Mac, on-device subtitles, Apple Speech, SRT, VTT, ASS, local transcription, macOS 26" />
+  <meta name="keywords" content="Cue, MKV player Mac, generate SRT Mac, offline subtitles, on-device subtitles, Apple Speech, IINA alternative, VLC alternative, transcribe video Mac, macOS 26" />
   <link rel="canonical" href="https://playrito.site/cue/" />
   <link rel="alternate" hreflang="en" href="https://playrito.site/cue/" />
   <link rel="alternate" hreflang="ru" href="https://playrito.site/cue/#ru" />
@@ -16,13 +16,13 @@
   <link rel="stylesheet" href="/styles.css" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Playrito" />
-  <meta property="og:title" content="Cue — macOS video player with on-device subtitles" />
-  <meta property="og:description" content="Native Mac player for MKV and more. Subtitles generated on-device with Apple Speech. Download Cue 0.1.5 for macOS 26+." />
+  <meta property="og:title" content="Cue — MKV player for Mac with on-device SRT" />
+  <meta property="og:description" content="Generate timed SRT subtitles while you watch. Offline MKV player for Mac. Free DMG, macOS 26+." />
   <meta property="og:url" content="https://playrito.site/cue/" />
   <meta property="og:image" content="https://playrito.site/cue/icon.png?v=20260908" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Cue — macOS video player with on-device subtitles" />
-  <meta name="twitter:description" content="Play MKV on Mac and generate subtitles locally. Free DMG, macOS 26+." />
+  <meta name="twitter:title" content="Cue — MKV player for Mac with on-device SRT" />
+  <meta name="twitter:description" content="Generate SRT subtitles while you watch, fully offline. Free MKV player for Mac." />
   <meta name="twitter:image" content="https://playrito.site/cue/icon.png?v=20260908" />
   <script type="application/ld+json">
   {
@@ -34,13 +34,13 @@
         "alternateName": "Cue macOS video player",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "macOS 26 or later",
-        "softwareVersion": "0.1.5",
+        "softwareVersion": "0.1.6",
         "url": "https://playrito.site/cue/",
-        "downloadUrl": "https://playrito.site/cue/downloads/Cue-0.1.5.dmg",
-        "installUrl": "https://playrito.site/cue/downloads/Cue-0.1.5.dmg",
+        "downloadUrl": "https://playrito.site/cue/downloads/Cue-0.1.6.dmg",
+        "installUrl": "https://playrito.site/cue/downloads/Cue-0.1.6.dmg",
         "image": "https://playrito.site/cue/icon.png?v=20260908",
         "screenshot": "https://playrito.site/cue/icon.png?v=20260908",
-        "description": "A native macOS video player that plays MKV, MP4, and MOV, and generates time-coded subtitles on-device with Apple Speech. Import SRT, VTT, and ASS tracks. Nothing is sent to a cloud recognizer.",
+        "description": "A native macOS MKV player that generates timed SRT subtitles on-device with Apple Speech while you watch. Import SRT, VTT, and ASS. Fully offline — nothing is sent to a cloud recognizer. A free open-source alternative to IINA and VLC when you need subtitles written on the Mac.",
         "author": {
           "@type": "Organization",
           "name": "Playrito",
@@ -75,18 +75,42 @@
         "mainEntity": [
           {
             "@type": "Question",
-            "name": "What is Cue?",
+            "name": "How do I generate an SRT on Mac without uploading the video?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Cue is a native macOS video player for local files. It plays MKV, MP4, MOV and other formats via libmpv, and can generate subtitles on your Mac with Apple Speech."
+              "text": "Open the video in Cue and generate subtitles with Apple Speech. Recognition runs on your Mac, fully offline. Export the timed track as SRT. Nothing is uploaded."
             }
           },
           {
             "@type": "Question",
-            "name": "Does Cue send audio to the cloud?",
+            "name": "Can Cue add subtitles to an MKV?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. Subtitle generation uses Apple Speech on-device. Video files stay on your Mac."
+              "text": "Yes. Cue plays MKV files, loads embedded or sidecar subtitles, imports SRT/VTT/ASS, and can generate a new timed track on-device. Export to SRT when you need a file next to the video."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Cue an IINA or VLC alternative?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Cue is a separate open-source player for local files. Use IINA or VLC if you only need playback. Choose Cue when you also want to generate SRT subtitles on the Mac without a cloud service."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Cue work fully offline?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Playback and subtitle generation use Apple Speech on-device. Video files never leave your Mac. No account and no internet are required after install."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Cue free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Cue is MIT-licensed. libmpv and related libraries keep their LGPL terms inside the app."
             }
           },
           {
@@ -95,14 +119,6 @@
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "macOS 26 or later, because Cue uses Apple’s on-device speech APIs."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "How do I download Cue?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Download Cue-0.1.5.dmg from https://playrito.site/cue/, open the disk image, and drag Cue into Applications."
             }
           }
         ]
@@ -133,18 +149,20 @@
     <section class="hero section" id="download">
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="eyebrow">Free for macOS 26+</p>
-          <h1>macOS video player that writes subtitles on your Mac</h1>
+          <p class="eyebrow">Free offline MKV player · macOS 26+</p>
+          <h1>Generate timed subtitles while you watch</h1>
           <p class="lead">
-            Cue plays local MKV, MP4, and MOV files, then generates time-coded subtitles with Apple Speech.
-            Audio never leaves the machine. Import SRT, VTT, or ASS if you already have a track.
+            Cue is a native MKV, MP4, and MOV player for Mac that writes time-coded SRT subtitles on-device
+            with Apple Speech — while you watch, or for the whole file. Fully offline: nothing goes to the cloud.
+            Import SRT, VTT, or ASS if you already have a track. A free open-source alternative to IINA and VLC
+            when you need subtitles generated on your Mac.
           </p>
           <div class="cta-row">
-            <a class="button primary" href="./downloads/Cue-0.1.5.dmg" download="Cue-0.1.5.dmg">Download Cue 0.1.5</a>
+            <a class="button primary" href="./downloads/Cue-0.1.6.dmg" download="Cue-0.1.6.dmg">Download Cue 0.1.6</a>
             <a class="button secondary" href="https://github.com/Odweike/cue">Source on GitHub</a>
           </div>
           <ul class="store-facts">
-            <li>Cue-0.1.5.dmg · ~36 MB</li>
+            <li>Cue-0.1.6.dmg · ~36 MB</li>
             <li>macOS 26 or later</li>
             <li>MIT · local files only</li>
           </ul>
@@ -158,9 +176,9 @@
           <h2 style="font-size: 22px; margin-bottom: 12px;">Cue</h2>
           <ul class="check-list">
             <li>MKV playback with embedded and sidecar subtitles</li>
-            <li>On-device transcription with Apple Speech</li>
+            <li>Generate SRT on-device with Apple Speech</li>
+            <li>Subtitles while watching, or transcribe the whole file</li>
             <li>Two styled overlay tracks, export to SRT</li>
-            <li>Floating controls, speed, audio delay, crop</li>
           </ul>
         </aside>
       </div>
@@ -169,8 +187,8 @@
     <section id="features" class="section alt">
       <div class="container">
         <div class="section-heading">
-          <h2>Built for local video, not a streaming clone</h2>
-          <p>Cue is a Mac player for files you already have — including MKV — with subtitles you can generate without uploading the movie.</p>
+          <h2>Offline subtitles for the files you already have</h2>
+          <p>Cue is a Mac player for local video — including MKV — with an on-device SRT generator. No upload, no Whisper in the cloud, no account.</p>
         </div>
         <div class="cards">
           <article class="card">
@@ -178,12 +196,12 @@
             <p>Playback goes through an embedded LGPL build of libmpv, so common local containers and codecs open without converting first.</p>
           </article>
           <article class="card">
-            <h3>On-device subtitles</h3>
-            <p>Apple SpeechAnalyzer and SpeechTranscriber run on your Mac. Generate a timed track while watching, or transcribe the whole file.</p>
+            <h3>Generate SRT while watching</h3>
+            <p>Apple SpeechAnalyzer and SpeechTranscriber run on your Mac. Create a timed subtitle track as you watch, or transcribe the whole file and export SRT.</p>
           </article>
           <article class="card">
             <h3>Imported tracks</h3>
-            <p>Load up to two SRT, VTT, or ASS files. Embedded MKV tracks and sidecar files next to the video are picked up automatically.</p>
+            <p>Load up to three SRT, VTT, or ASS files. Embedded MKV tracks and sidecar files next to the video are picked up automatically.</p>
           </article>
           <article class="card">
             <h3>Independent styles</h3>
@@ -205,7 +223,7 @@
       <div class="container narrow">
         <h2>Install</h2>
         <ol class="steps">
-          <li><strong>Download the disk image.</strong> Use the button above for <a href="./downloads/Cue-0.1.5.dmg" download="Cue-0.1.5.dmg">Cue-0.1.5.dmg</a>. SHA-256 checksum: <a href="./downloads/Cue-0.1.5.dmg.sha256">Cue-0.1.5.dmg.sha256</a>.</li>
+          <li><strong>Download the disk image.</strong> Use the button above for <a href="./downloads/Cue-0.1.6.dmg" download="Cue-0.1.6.dmg">Cue-0.1.6.dmg</a>. SHA-256 checksum: <a href="./downloads/Cue-0.1.6.dmg.sha256">Cue-0.1.6.dmg.sha256</a>.</li>
           <li><strong>Open the DMG</strong> and drag Cue into Applications.</li>
           <li><strong>Launch from Applications.</strong> If macOS says the app cannot be opened, Control-click Cue → Open.</li>
         </ol>
@@ -218,20 +236,32 @@
         <h2>FAQ</h2>
         <div class="faq-list">
           <article>
+            <h3>How do I generate an SRT on Mac without uploading the video?</h3>
+            <p>Open the file in Cue and generate subtitles with Apple Speech. Recognition stays on your Mac. Export the timed track as SRT — nothing is uploaded.</p>
+          </article>
+          <article>
+            <h3>Can Cue add subtitles to an MKV?</h3>
+            <p>Yes. Cue plays MKV, loads embedded or sidecar tracks, imports SRT/VTT/ASS, and can generate a new timed track on-device. Export SRT when you need a file next to the video.</p>
+          </article>
+          <article>
+            <h3>Is this an IINA or VLC alternative?</h3>
+            <p>Cue is a separate open-source player for local files. Use IINA or VLC if you only need playback. Choose Cue when you also want to generate SRT subtitles on the Mac without a cloud service.</p>
+          </article>
+          <article>
+            <h3>Does it work fully offline?</h3>
+            <p>Yes. Playback and subtitle generation use on-device Apple Speech. No account and no internet are required after install. Video never leaves your Mac.</p>
+          </article>
+          <article>
             <h3>Is Cue free?</h3>
             <p>Yes. Cue is MIT-licensed. libmpv and related libraries keep their LGPL terms inside the app.</p>
           </article>
           <article>
-            <h3>Does it replace IINA?</h3>
-            <p>It is a separate player focused on local files plus on-device subtitle generation. If you only need MKV playback, other players exist; Cue exists so subtitles can be written on the Mac without a cloud service.</p>
+            <h3>Is the app notarized?</h3>
+            <p>Not yet. It is signed for development/local distribution. First launch may need Control-click → Open.</p>
           </article>
           <article>
             <h3>Where is the source?</h3>
-            <p>Public repository: <a href="https://github.com/Odweike/cue">github.com/Odweike/cue</a>. Latest GitHub release: v0.1.5.</p>
-          </article>
-          <article>
-            <h3>Is the app notarized?</h3>
-            <p>Not yet. It is signed for development/local distribution. First launch may need Control-click → Open.</p>
+            <p>Public repository: <a href="https://github.com/Odweike/cue">github.com/Odweike/cue</a>. Latest GitHub release: v0.1.6.</p>
           </article>
         </div>
       </div>
@@ -239,17 +269,32 @@
 
     <section id="ru" class="section" lang="ru">
       <div class="container narrow">
-        <h2>Cue для macOS</h2>
+        <h2>Cue — создать SRT на Mac офлайн</h2>
         <p>
-          Cue — нативный видеоплеер для Mac: открывает MKV, MP4 и MOV, подтягивает встроенные и рядом лежащие субтитры,
-          умеет импортировать SRT / VTT / ASS и <strong>генерировать таймкоды локально</strong> через Apple Speech.
-          Файл никуда не загружается.
+          Cue — бесплатный видеоплеер для Mac: открывает MKV, MP4 и MOV, подтягивает встроенные и рядом лежащие субтитры,
+          импортирует SRT / VTT / ASS и <strong>распознаёт речь в видео</strong> через Apple Speech.
+          Субтитры к MKV без интернета: файл никуда не загружается, это не Whisper в облаке.
         </p>
         <p>
+          Генерируйте таймкоды во время просмотра или для всего файла и экспортируйте SRT.
           Нужен macOS 26 или новее. Скачайте DMG кнопкой выше, перетащите Cue в Программы.
           Если система не открывает приложение с первого раза — Control-клик по Cue → Открыть.
         </p>
-        <p class="subnote">Версия 0.1.5. Исходники: GitHub Odweike/cue. Поддержка: <a href="mailto:support@playrito.site">support@playrito.site</a>.</p>
+        <div class="faq-list">
+          <article>
+            <h3>Как создать SRT на Mac без загрузки видео?</h3>
+            <p>Откройте файл в Cue и сгенерируйте субтитры. Распознавание идёт на вашем Mac. Экспортируйте дорожку в SRT — в облако ничего не уходит.</p>
+          </article>
+          <article>
+            <h3>Можно ли добавить субтитры к MKV?</h3>
+            <p>Да. Cue играет MKV, подхватывает встроенные и sidecar-дорожки, импортирует SRT/VTT/ASS и умеет создать новую таймкодированную дорожку локально.</p>
+          </article>
+          <article>
+            <h3>Это альтернатива IINA или VLC?</h3>
+            <p>Отдельный опенсорс-плеер. IINA и VLC достаточно, если нужен только просмотр. Cue — когда нужны ещё и офлайн-субтитры, сгенерированные на Mac.</p>
+          </article>
+        </div>
+        <p class="subnote">Версия 0.1.6. Исходники: GitHub Odweike/cue. Поддержка: <a href="mailto:support@playrito.site">support@playrito.site</a>.</p>
       </div>
     </section>
 
@@ -257,7 +302,7 @@
       <div class="container narrow">
         <h2>Download Cue for Mac</h2>
         <p>Disk image for macOS 26+. Same file as the GitHub release, hosted here for search and direct install.</p>
-        <a class="button primary" href="./downloads/Cue-0.1.5.dmg" download="Cue-0.1.5.dmg">Download Cue-0.1.5.dmg</a>
+        <a class="button primary" href="./downloads/Cue-0.1.6.dmg" download="Cue-0.1.6.dmg">Download Cue-0.1.6.dmg</a>
       </div>
     </section>
   </main>
@@ -274,5 +319,6 @@
       </nav>
     </div>
   </footer>
+<script data-goatcounter="https://playrito.site/count" async src="https://playrito.site/count.js"></script>
 </body>
 </html>

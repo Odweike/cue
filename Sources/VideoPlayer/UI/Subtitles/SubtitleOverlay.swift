@@ -62,6 +62,6 @@ struct SubtitleOverlay: View {
     }
 
     private func positionPadding(for style: SubtitleStyle) -> Double {
-        style.position == .custom ? style.verticalOffset : 60
+        style.verticalOffset
     }
 }

@@ -22,7 +22,7 @@
   <a href="#features">Features</a>
 </p>
 
-Cue is a free, open-source video player for Mac — a lightweight native alternative to VLC and IINA. It plays common local video files (MKV, MP4, MOV, and more) through an embedded LGPL build of libmpv. Subtitles can be imported (SRT, VTT, ASS), styled independently for two tracks, or generated offline on your Mac with Apple Speech — an on-device AI subtitle generator that sends nothing to a cloud recognizer.
+Cue is a free, open-source video player for Mac — a lightweight native alternative to VLC and IINA. It plays common local video files (MKV, MP4, MOV, and more) through an embedded LGPL build of libmpv. Subtitles can be imported (SRT, VTT, ASS), styled independently for up to three tracks, or generated offline on your Mac with Apple Speech — an on-device AI subtitle generator that sends nothing to a cloud recognizer.
 
 If Cue is useful to you, a ⭐ on GitHub helps others find the project.
 
@@ -39,7 +39,7 @@ If Cue is useful to you, a ⭐ on GitHub helps others find the project.
 ## Install
 
 1. Open [playrito.site/cue](https://playrito.site/cue/) or the [GitHub release](https://github.com/Odweike/cue/releases/latest).
-2. Download **Cue-0.1.5.dmg**.
+2. Download **Cue-0.1.6.dmg**.
 3. Open the disk image and drag **Cue** into **Applications**.
 4. Launch Cue from Applications.
 
@@ -82,7 +82,7 @@ xcodebuild \
 Package a disk image after a successful Release build:
 
 ```sh
-./scripts/package-dmg.sh 0.1.5
+./scripts/package-dmg.sh 0.1.6
 ```
 
 ## Architecture
